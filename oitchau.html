@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle Diário de Ponto - Oitchau</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --brand: #0056b3; /* Azul Oitchau */
+            --bg: #f4f7f6;
+            --white: #ffffff;
+            --border: #ddd;
+            --text: #333;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
+
+        /* --- HEADER --- */
+        .top-panel {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            border-top: 5px solid var(--brand);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .title-box h1 { margin: 0; color: var(--brand); font-size: 20px; }
+        .title-box p { margin: 5px 0 0; color: #777; font-size: 12px; }
+
+        .control-group { display: flex; flex-direction: column; }
+        label { font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px; text-transform: uppercase; }
+
+        /* Inputs */
+        input[type="date"], input[type="text"] {
+            padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; outline: none;
+        }
+        
+        input[type="date"] { border-color: var(--brand); background: #eef6ff; font-weight: bold; color: var(--brand); }
+        input#approverName { width: 200px; border-left: 3px solid var(--brand); }
+
+        /* Buttons */
+        .btn-row { display: flex; gap: 10px; }
+        .btn {
+            padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold;
+            display: flex; align-items: center; gap: 5px; font-size: 13px; transition: 0.2s;
+        }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        
+        .btn-save { background: var(--brand); }
+        .btn-trash { background: #dc3545; }
+        .btn-excel { background: #218838; }
+
+        /* --- SUMMARY BAR --- */
+        .summary-bar {
+            display: flex; gap: 15px; margin-bottom: 20px;
+        }
+        .card {
+            background: white; padding: 10px 20px; border-radius: 6px; flex: 1;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center;
+        }
+        .card h3 { margin: 0; font-size: 24px; color: var(--brand); }
+        .card span { font-size: 12px; color: #666; }
+
+        /* --- TABLE --- */
+        .branch-block {
+            background: white; margin-bottom: 20px; border-radius: 8px; overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee;
+        }
+        
+        .branch-head {
+            background: #f8f9fa; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #eee;
+        }
+        .branch-name { font-weight: bold; color: #444; }
+
+        .btn-branch-approve {
+            background: var(--brand); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 10px 15px; font-size: 12px; color: #888; border-bottom: 2px solid #eee; }
+        td { padding: 8px 15px; border-bottom: 1px solid #f0f0f0; font-size: 13px; vertical-align: middle; }
+        tr:hover { background: #faffff; }
+
+        /* Obs Input */
+        .obs-input {
+            width: 100%; border: none; border-bottom: 1px solid #ccc; background: transparent; padding: 4px; font-size: 12px;
+        }
+        .obs-input:focus { border-bottom: 1px solid var(--brand); outline: none; background: #fff; }
+
+        /* Status Badges */
+        .status-badge {
+            padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; cursor: pointer; display: inline-block; width: 80px; text-align: center; border: 1px solid transparent;
+        }
+        .st-pendente { background: #ffeeba; color: #856404; border-color: #ffeeba; }
+        .st-ok { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+        .st-erro { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+
+    </style>
+</head>
+<body>
+
+    <div class="top-panel">
+        <div class="title-box">
+            <h1><i class="fas fa-tasks"></i> Aprovação Diária</h1>
+            <p>Gerenciamento Ponto a Ponto</p>
+        </div>
+
+        <div class="control-group">
+            <label>Selecione o Dia</label>
+            <input type="date" id="datePicker" onchange="loadDate()">
+        </div>
+
+        <div class="control-group">
+            <label>Quem está aprovando?</label>
+            <input type="text" id="approverName" placeholder="Seu nome (Ex: Kaio)" onchange="saveConfig()">
+        </div>
+
+        <div class="control-group">
+            <label>Ações do Dia</label>
+            <div class="btn-row">
+                <button class="btn btn-save" onclick="approveAllDaily()">
+                    <i class="fas fa-check-double"></i> Aprovar TUDO do Dia
+                </button>
+                <button class="btn btn-trash" onclick="clearDay()">
+                    <i class="fas fa-eraser"></i> Limpar Dia
+                </button>
+                <button class="btn btn-excel" onclick="exportDay()">
+                    <i class="fas fa-file-excel"></i> Excel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="summary-bar">
+        <div class="card">
+            <h3 id="count-ok">0</h3>
+            <span>Aprovados</span>
+        </div>
+        <div class="card">
+            <h3 id="count-pending">0</h3>
+            <span>Pendentes</span>
+        </div>
+        <div class="card">
+            <h3 id="count-total">0</h3>
+            <span>Total Motoristas</span>
+        </div>
+    </div>
+
+    <div id="tableContainer"></div>
+
+    <script>
+        // --- BASE DE DADOS FIXA (Do seu PDF) ---
+        // Contém todos os motoristas já extraídos
+        const driverList = [
+            {b:"Apucarana", c:"21001", n:"Anderson Patrício Schatz"}, {b:"Apucarana", c:"19999", n:"Antonio Gomes de Lima"}, {b:"Apucarana", c:"21672", n:"João Marcos Balachi"}, {b:"Apucarana", c:"9213", n:"Olímpio Pereira da Silva"}, {b:"Apucarana", c:"21474", n:"Ricardo Hikazutani Marques"},
+            {b:"Araraquara", c:"2037", n:"Ademilson Jesus da Silva"}, {b:"Araraquara", c:"1968", n:"Anderson Lucas Vieira Rocha"}, {b:"Araraquara", c:"1974", n:"Alexsandro Brito Meira Rodrigues"}, {b:"Araraquara", c:"1843", n:"Anailson Nunes dos Santos"}, {b:"Araraquara", c:"1880", n:"Antonio Fernando de Alencar"}, {b:"Araraquara", c:"1760", n:"Amilton Teixeira dos Santos"}, {b:"Araraquara", c:"1969", n:"Dayvison Bruno Marcelino da Silva"}, {b:"Araraquara", c:"1995", n:"José Adelso Pereira Alves"}, {b:"Araraquara", c:"2071", n:"Luiz Fernando Munhoz Torres"}, {b:"Araraquara", c:"2042", n:"Michel de Araújo dos Santos"}, {b:"Araraquara", c:"1410", n:"Pedro Luiz da Silva"}, {b:"Araraquara", c:"2100", n:"Tiago Pereira da Silva Santos"},
+            {b:"Brasília", c:"1849", n:"Antonio Sergio Bispo Dantas"}, {b:"Brasília", c:"1066", n:"Carlos Santana da Silva Neto"}, {b:"Brasília", c:"1994", n:"Gesiel Ferreira dos Santos"}, {b:"Brasília", c:"1087", n:"Hélio Saturnino da Silva"}, {b:"Brasília", c:"1848", n:"Jucelino Cintra dos Santos"}, {b:"Brasília", c:"1884", n:"Marcos Tulio de Oliveira"}, {b:"Brasília", c:"1499", n:"Pedro Willa da Silva Nascimento"}, {b:"Brasília", c:"1819", n:"Robson Alves dos Santos"}, {b:"Brasília", c:"2069", n:"Felipe Batista da Silva"}, {b:"Brasília", c:"2072", n:"Marcio Spinosa Sousa"}, {b:"Brasília", c:"2073", n:"Paulo Henrique Nunes dos Santos"},
+            {b:"Cascavel", c:"21308", n:"Alexandre Magno Jacobs"}, {b:"Cascavel", c:"14733", n:"Alvandir Alves de Oliveira"}, {b:"Cascavel", c:"1993", n:"Amilton Golub"}, {b:"Cascavel", c:"1544", n:"Atair do Bonfim"}, {b:"Cascavel", c:"1952", n:"Carlos Alberto Olivetti"}, {b:"Cascavel", c:"1389", n:"Claudemir Galvan"}, {b:"Cascavel", c:"1402", n:"Claudemar Pasti"}, {b:"Cascavel", c:"2095", n:"Daniel Eduardo da Cruz"}, {b:"Cascavel", c:"2083", n:"Deoclides Marcos da Silveira"}, {b:"Cascavel", c:"1676", n:"Douglas Schmitt da Silva"}, {b:"Cascavel", c:"19450", n:"Odair Soares de Carvalho"}, {b:"Cascavel", c:"2031", n:"Ronaldo de Souza"}, {b:"Cascavel", c:"1759", n:"Santiago Teixeira Bertolino"}, {b:"Cascavel", c:"1816", n:"Valderi de Jesus Fernando"}, {b:"Cascavel", c:"2057", n:"Wandei Braz de Camargo"},
+            {b:"Campinas", c:"2032", n:"Adriano Oliveira de Souza"}, {b:"Campinas", c:"1301", n:"Alex Rubens Tiba Fiori"}, {b:"Campinas", c:"1869", n:"Domingos Barbosa da Silva"}, {b:"Campinas", c:"2094", n:"Edson Antonio da Silva"}, {b:"Campinas", c:"1996", n:"Gustavo Gonsalves do Nascimento"}, {b:"Campinas", c:"1935", n:"Jhone dos Santos Dias"}, {b:"Campinas", c:"2078", n:"João Gabriel Lima dos Santos"}, {b:"Campinas", c:"1329", n:"José Tavares Filho"}, {b:"Campinas", c:"1841", n:"Luciano Pereira da Silva"}, {b:"Campinas", c:"2079", n:"Marcelo Magalhães"}, {b:"Campinas", c:"2089", n:"Moisés Alves Teixeira"}, {b:"Campinas", c:"2044", n:"Otávio Augusto dos Santos Custódio"}, {b:"Campinas", c:"2112", n:"Tiago Bezerra de Menezes Fagian"}, {b:"Campinas", c:"2017", n:"Valdemir dos Santos"}, {b:"Campinas", c:"1802", n:"Willian dos Santos de Moura"},
+            {b:"Campo Mourão", c:"19413", n:"Ademir Ribeiro Pepineli"}, {b:"Campo Mourão", c:"85", n:"Adenilson Araújo do Vale"}, {b:"Campo Mourão", c:"21712", n:"Adriano Luiz Ramos"}, {b:"Campo Mourão", c:"541", n:"Agilson Moleta"}, {b:"Campo Mourão", c:"1944", n:"Altervir Silveira da Silva"}, {b:"Campo Mourão", c:"1549", n:"Carlos Barbosa de Oliveira"}, {b:"Campo Mourão", c:"21825", n:"Cilas Rosa Sobrinho"}, {b:"Campo Mourão", c:"2011", n:"Cleber Gabriel da Rocha"}, {b:"Campo Mourão", c:"70", n:"Denis Isao Okubo"}, {b:"Campo Mourão", c:"21740", n:"Denis Domingues"}, {b:"Campo Mourão", c:"1265", n:"Douglas Soares Dias"}, {b:"Campo Mourão", c:"21869", n:"Douglas Vieira Santana"}, {b:"Campo Mourão", c:"322", n:"Edevanildo Francisco Lima"}, {b:"Campo Mourão", c:"1091", n:"Elton Jonnatan dos Santos"}, {b:"Campo Mourão", c:"21843", n:"Ewerton Henrique Nunes"}, {b:"Campo Mourão", c:"1088", n:"Fernando Ferreira da Silva"}, {b:"Campo Mourão", c:"2065", n:"Ismael Dias de Souza Ventura"}, {b:"Campo Mourão", c:"1669", n:"Iury Araújo do Vale"}, {b:"Campo Mourão", c:"1967", n:"Jadson Enéias Fidelis"}, {b:"Campo Mourão", c:"1966", n:"João Paulo Souza de Lima"}, {b:"Campo Mourão", c:"21388", n:"Jhione Cleiton Coelho Capiche"}, {b:"Campo Mourão", c:"20316", n:"Jonatas do Nascimento"}, {b:"Campo Mourão", c:"20874", n:"Junior Stevanelli Martins"}, {b:"Campo Mourão", c:"2040", n:"Leonardo Vieira da Silva"}, {b:"Campo Mourão", c:"1446", n:"Marcio da Silva"}, {b:"Campo Mourão", c:"1109", n:"Marcos Antonio de Campos"}, {b:"Campo Mourão", c:"21853", n:"Paulo João dos Santos"}, {b:"Campo Mourão", c:"1315", n:"Reginaldo de Paula"}, {b:"Campo Mourão", c:"1422", n:"Reginaldo Vitorino de Oliveira"}, {b:"Campo Mourão", c:"1823", n:"Robson Kummorow Ferreira"}, {b:"Campo Mourão", c:"1978", n:"Rodrigo Aparecido Mafra de Assis"}, {b:"Campo Mourão", c:"527", n:"Rodrigo Antonio Viana"}, {b:"Campo Mourão", c:"2087", n:"Romário da Silva"}, {b:"Campo Mourão", c:"2053", n:"Romário Santos Sá"}, {b:"Campo Mourão", c:"1758", n:"Sergio Gomes Ferreira"}, {b:"Campo Mourão", c:"1308", n:"Sergio Miguel da Silva"}, {b:"Campo Mourão", c:"1219", n:"Wesley Diogo Gomes Vieria"},
+            {b:"Curitiba", c:"1470", n:"Agripino Moreira de Almeida"}, {b:"Curitiba", c:"1501", n:"Anderson Antonio de Oliveira"}, {b:"Curitiba", c:"1797", n:"Anderson de Oliveira Lima"}, {b:"Curitiba", c:"1972", n:"Cleucir Alves Gonzales"}, {b:"Curitiba", c:"2098", n:"Daniel Guerra"}, {b:"Curitiba", c:"1861", n:"Djalma Lúcio de Souza Castro"}, {b:"Curitiba", c:"1862", n:"Edenilson Vaz de França"}, {b:"Curitiba", c:"1860", n:"Edinan Henrique Ferreira"}, {b:"Curitiba", c:"1235", n:"Gilvan Alves da Silva"}, {b:"Curitiba", c:"1795", n:"Flávio Reis da Silva"}, {b:"Curitiba", c:"2035", n:"Jean Douglas Gonsalves de Jesus"}, {b:"Curitiba", c:"1142", n:"Jeferson Costa de Souza"}, {b:"Curitiba", c:"1857", n:"Jailton Azeredo dos Santos"}, {b:"Curitiba", c:"2099", n:"João Barbosa dos Santos"}, {b:"Curitiba", c:"2091", n:"João Marcos Santana Machado"}, {b:"Curitiba", c:"1696", n:"Jorge Antonio Silva"}, {b:"Curitiba", c:"1798", n:"Laerson José de Santana"}, {b:"Curitiba", c:"1814", n:"Leandro aparecido dos Santos"}, {b:"Curitiba", c:"1909", n:"Leonardo Francisco da Silva"}, {b:"Curitiba", c:"1776", n:"Luiz Carlos do Nascimento"}, {b:"Curitiba", c:"1796", n:"Luiz Carlos Vicente Ferreira"}, {b:"Curitiba", c:"1788", n:"Luiz Fernando Pinto"}, {b:"Curitiba", c:"1858", n:"Maicon Rodrigues Ribeiro"}, {b:"Curitiba", c:"789", n:"Nilton José Rodrigues"}, {b:"Curitiba", c:"618", n:"Rafael de Souza Santos"}, {b:"Curitiba", c:"1885", n:"Reinaldo Moreira Filho"}, {b:"Curitiba", c:"1990", n:"Robisclei dos Santos Joaquim"}, {b:"Curitiba", c:"2019", n:"Thiago do Nascimento Flor"}, {b:"Curitiba", c:"1743", n:"William da Conceição David"}, {b:"Curitiba", c:"1342", n:"Willian Cleyton Siqueira"}, {b:"Curitiba", c:"2080", n:"Wesley Roberto da Silva Alves"}, {b:"Curitiba", c:"21870", n:"Cesar Augusto Dias dos Santos"},
+            {b:"Florianópolis", c:"1584", n:"Adão Valdecir Oliveira"}, {b:"Florianópolis", c:"2004", n:"Carlos Alexandre da Costa Wolf"}, {b:"Florianópolis", c:"2024", n:"Daniel Luiz de Souza Guimarães"}, {b:"Florianópolis", c:"2058", n:"Ederson Vicente da Silva"}, {b:"Florianópolis", c:"1052", n:"Jeferson Luiz da Silva"}, {b:"Florianópolis", c:"2045", n:"Ferdinando Giareta"}, {b:"Florianópolis", c:"1923", n:"José Rafael Marques"}, {b:"Florianópolis", c:"2005", n:"João Vitor Knevitz Cardoso"}, {b:"Florianópolis", c:"1887", n:"Luis Carlos Pivoto Dorneles"}, {b:"Florianópolis", c:"1888", n:"Nafael Vieira da Silva"}, {b:"Florianópolis", c:"2097", n:"Paulo Sergio Rosa Batista"}, {b:"Florianópolis", c:"2096", n:"Rarisson André Aquino Vieira"}, {b:"Florianópolis", c:"1753", n:"Rangel Rosa"}, {b:"Florianópolis", c:"2046", n:"Renan Felipe da Costa"}, {b:"Florianópolis", c:"1176", n:"Silvano Feijó"},
+            {b:"Foz do Iguaçu", c:"2007", n:"Cleiton B. de Oliveira"}, {b:"Foz do Iguaçu", c:"2052", n:"Denivaldo Dorta"}, {b:"Foz do Iguaçu", c:"2008", n:"Erivaldo Pereira de Macedo"}, {b:"Foz do Iguaçu", c:"2066", n:"Jean Patrick Cabral Felisberto"}, {b:"Foz do Iguaçu", c:"2082", n:"Nivaldo de Moraes Sampaio"}, {b:"Foz do Iguaçu", c:"1953", n:"Renato Freire dos Santos"}, {b:"Foz do Iguaçu", c:"1662", n:"Sergio Augusto Ribeiro dos Santos"},
+            {b:"Goioerê", c:"21806", n:"Allan Araújo de Oliveira"}, {b:"Goioerê", c:"18328", n:"Alvaro Agostini"}, {b:"Goioerê", c:"1965", n:"Gabriel Esmeraldo Garcia"}, {b:"Goioerê", c:"19994", n:"João Alves da Cunha"}, {b:"Goioerê", c:"21258", n:"José Aparecido Perecin"}, {b:"Goioerê", c:"20362", n:"Lázaro Aparecido de Lima"}, {b:"Goioerê", c:"21857", n:"Leonardo Romeiro Alves"}, {b:"Goioerê", c:"19770", n:"Roberto do Carmo Ubaldino"},
+            {b:"Guarapuava", c:"21479", n:"Ariquemes Junior Carneiro"}, {b:"Guarapuava", c:"21603", n:"Daniel Pacheco"}, {b:"Guarapuava", c:"1228", n:"Diego Pires Bueno Moreira"}, {b:"Guarapuava", c:"21739", n:"Everaldo José Michalesi"}, {b:"Guarapuava", c:"1900", n:"Ildo de Campos Junior"}, {b:"Guarapuava", c:"21745", n:"Jociel Pieteniska Fonseca"}, {b:"Guarapuava", c:"1108", n:"Juliano de Oliveira"}, {b:"Guarapuava", c:"1210", n:"Julio Pereira Herbst"}, {b:"Guarapuava", c:"21218", n:"Marcelo Bueno Bertonceli"}, {b:"Guarapuava", c:"19019", n:"Neivaldo Carneiro"}, {b:"Guarapuava", c:"20527", n:"Pedro Celso Santos"}, {b:"Guarapuava", c:"19622", n:"Romildo Rodrigues da Silva"},
+            {b:"Irati", c:"1432", n:"Cristiano Alves Kuller"}, {b:"Irati", c:"2018", n:"Eriton Miranda"}, {b:"Irati", c:"831", n:"José Bueno"}, {b:"Irati", c:"2085", n:"Marciel Taborda"}, {b:"Irati", c:"846", n:"Maurício Quadros"}, {b:"Irati", c:"1667", n:"Nilton Junior Capote"}, {b:"Irati", c:"1613", n:"Paulo da Silva Gonsalves"}, {b:"Irati", c:"830", n:"William Dyego de Oliveira"},
+            {b:"Lages", c:"1076", n:"Alexandre José Amaral Raulino"}, {b:"Lages", c:"1691", n:"Alisson Salomão Atanasio"}, {b:"Lages", c:"1079", n:"Claudio de Souza Santos"}, {b:"Lages", c:"2002", n:"Ezequiel Petry"}, {b:"Lages", c:"1964", n:"José Iradi da Silveira Mota"}, {b:"Lages", c:"2001", n:"Josiel Oliveira de Campos"}, {b:"Lages", c:"1085", n:"Lindomar Rodrigues"}, {b:"Lages", c:"1537", n:"Roseraldo Voni Moraes"}, {b:"Lages", c:"1771", n:"Vanderlei Duarte Camilo"},
+            {b:"Londrina", c:"2068", n:"Anderson dos Anjos Carmargo"}, {b:"Londrina", c:"2015", n:"Anderson José Hidaldo"}, {b:"Londrina", c:"2039", n:"Anderson da Silva Bueno"}, {b:"Londrina", c:"1520", n:"Adriano Aparecido Silverio"}, {b:"Londrina", c:"505", n:"Adriano José Batista"}, {b:"Londrina", c:"1906", n:"Allan Junior Costa"}, {b:"Londrina", c:"1208", n:"Amarildo dos Santos Trento"}, {b:"Londrina", c:"1015", n:"Cassio Alves de Moura"}, {b:"Londrina", c:"1961", n:"Claudian Leonel dos Santos"}, {b:"Londrina", c:"1602", n:"David Cicero Inácio"}, {b:"Londrina", c:"2022", n:"Edson Rodrigues da Silva"}, {b:"Londrina", c:"1200", n:"Edival da Silva"}, {b:"Londrina", c:"1898", n:"Edivandro do Nascimento Ferreira"}, {b:"Londrina", c:"2023", n:"Erik Wolski Toledo"}, {b:"Londrina", c:"1677", n:"Everson Alan Momesso"}, {b:"Londrina", c:"421", n:"Jaime Carvalho da Costa"}, {b:"Londrina", c:"587", n:"João Marquesete Filho"}, {b:"Londrina", c:"1962", n:"José dos Santos Freitas"}, {b:"Londrina", c:"1886", n:"Maycon Antonio Alves Lopes"}, {b:"Londrina", c:"1149", n:"Marcelo dos Santos Oliveira"}, {b:"Londrina", c:"1206", n:"Nilton de Souza Valério"}, {b:"Londrina", c:"1774", n:"Rodinaldo Carlos Palmeira"}, {b:"Londrina", c:"21833", n:"Tiago Henrique Borgatto Mendes"}, {b:"Londrina", c:"1998", n:"Wilson Brescia"},
+            {b:"Maringá", c:"965", n:"Antonio Carlos de Lima"}, {b:"Maringá", c:"2064", n:"Irineu Eberson da Silva Lapas"}, {b:"Maringá", c:"21827", n:"Jonathan Felipe Pereira da Luz"}, {b:"Maringá", c:"21850", n:"Mário Henrique Gonsalves"},
+            {b:"Marilândia do Sul", c:"16349", n:"Antônio Ap. Lourenço"},
+            {b:"Paranavaí", c:"726", n:"Carlos Eduardo Torres Ferreira"}, {b:"Paranavaí", c:"1614", n:"Emerson Fernandes de Oliveira"}, {b:"Paranavaí", c:"1216", n:"Junior Mendonça Santos"}, {b:"Paranavaí", c:"21847", n:"Rodrigo Firmino da Silva"}, {b:"Paranavaí", c:"727", n:"Vinicius José Claudino Santos"}, {b:"Paranavaí", c:"21828", n:"Wallace Denilson Moreno Moraes"}, {b:"Paranavaí", c:"21855", n:"William Batista Borges"},
+            {b:"Ponta Grossa", c:"193", n:"Abel de Carvalho"}, {b:"Ponta Grossa", c:"2081", n:"Alessandro de Jesus Martins"}, {b:"Ponta Grossa", c:"2012", n:"Alisson Fernando Souza"}, {b:"Ponta Grossa", c:"1963", n:"Anderson Sovinski"}, {b:"Ponta Grossa", c:"1872", n:"Bruno Lima de Oliveira"}, {b:"Ponta Grossa", c:"474", n:"Carlos Alves Pereira"}, {b:"Ponta Grossa", c:"1532", n:"Cesar Cassiano da Silva"}, {b:"Ponta Grossa", c:"1794", n:"David Ribeiro"}, {b:"Ponta Grossa", c:"1764", n:"Diego Cristiano de Almeida"}, {b:"Ponta Grossa", c:"1697", n:"Douglas Ricardo Martins de Araújo"}, {b:"Ponta Grossa", c:"1804", n:"Elias Costa Rosa"}, {b:"Ponta Grossa", c:"2077", n:"Franquen Cezar da Cruz dos Santos"}, {b:"Ponta Grossa", c:"1725", n:"Geraldo Cesar Rosa de Oliveira"}, {b:"Ponta Grossa", c:"1973", n:"Jardel Teixeira da Silva"}, {b:"Ponta Grossa", c:"2051", n:"João Alfredo Dias Silveira"}, {b:"Ponta Grossa", c:"2050", n:"João Ricardo Quadros Quentin"}, {b:"Ponta Grossa", c:"632", n:"Joarez Marcelo Valhux"}, {b:"Ponta Grossa", c:"1971", n:"Mauro Sergio da Silva Junior"}, {b:"Ponta Grossa", c:"1160", n:"Osmair Moraes de Jesus"}, {b:"Ponta Grossa", c:"2034", n:"Osnan Ferreira Haas"}, {b:"Ponta Grossa", c:"952", n:"Paulo Henrique Rodrigues de Mello"}, {b:"Ponta Grossa", c:"1793", n:"Rafhael de Oliveira Martins"}, {b:"Ponta Grossa", c:"1734", n:"Renato Machado de Lima"}, {b:"Ponta Grossa", c:"2062", n:"Robson Simar Pedroso"}, {b:"Ponta Grossa", c:"1164", n:"Rodrigo Canani de Paula"},
+            {b:"Porto Alegre", c:"1060", n:"Adelir Tonieto"}, {b:"Porto Alegre", c:"1896", n:"Amauri de Jesus"}, {b:"Porto Alegre", c:"1600", n:"Ari Galvão"}, {b:"Porto Alegre", c:"990", n:"Denarde Mendes Bandeira"}, {b:"Porto Alegre", c:"2014", n:"Fabrício da Silva Dinatt"}, {b:"Porto Alegre", c:"2061", n:"Gilson Abreu"}, {b:"Porto Alegre", c:"1779", n:"José Antonio Pires Neto"}, {b:"Porto Alegre", c:"2060", n:"Leandro Aguiar dos Santos"}, {b:"Porto Alegre", c:"1881", n:"Leandro Quintanilha dos Santos"}, {b:"Porto Alegre", c:"1930", n:"Matheus Kalata do Amaral"}, {b:"Porto Alegre", c:"2075", n:"Nathan Quevedo Ribeiro"}, {b:"Porto Alegre", c:"1977", n:"Paulo Rogério Tenedini"}, {b:"Porto Alegre", c:"2013", n:"Paulo Victor Nunes Rocha"}, {b:"Porto Alegre", c:"2030", n:"Vagner da Silva Glapinski"},
+            {b:"Roncador", c:"21852", n:"Alessandro Koziel"}, {b:"Roncador", c:"19169", n:"Celso Joenk"}, {b:"Roncador", c:"20988", n:"Diego Carmona de Souza"}, {b:"Roncador", c:"21563", n:"José Hilareski Junior"}, {b:"Roncador", c:"751", n:"Valter Rodrigues Carneiro"},
+            {b:"Pitanga", c:"16653", n:"Antonio de Jesus de Campos"}, {b:"Pitanga", c:"19556", n:"Carlos Roberto da Silva"}, {b:"Pitanga", c:"20210", n:"Claudecir de Araújo"}, {b:"Pitanga", c:"21747", n:"José de Oliveira"}, {b:"Pitanga", c:"17969", n:"Mário Sérgio Kuchuruba"}, {b:"Pitanga", c:"21453", n:"Roberto Rank"}, {b:"Pitanga", c:"21756", n:"Roni Willian dos Santos Caetano"},
+            {b:"São Paulo", c:"2088", n:"Bruce Wybson Ramos Sousa"}, {b:"São Paulo", c:"1559", n:"Edmilson de Souza Araújo"}, {b:"São Paulo", c:"1086", n:"Ernesto Leite dos Santos Junior"}, {b:"São Paulo", c:"2090", n:"Henrique Santos do Nascimento"}, {b:"São Paulo", c:"1878", n:"Jairo Cordeiro de Oliveira"}, {b:"São Paulo", c:"2070", n:"Jean da Silva Santos"}, {b:"São Paulo", c:"1460", n:"José Ferreira da Silva Filho"}, {b:"São Paulo", c:"2063", n:"Marcio José dos Santos"}, {b:"São Paulo", c:"2020", n:"Sandro Leite de Moraes"},
+            {b:"Toledo", c:"1908", n:"Alexsandro dos Santos de Souza"}, {b:"Toledo", c:"20572", n:"Calaudino Ribeiro"}, {b:"Toledo", c:"1852", n:"Calil Ferreira Ramos"}, {b:"Toledo", c:"19102", n:"Carlos Roberto Santos"}, {b:"Toledo", c:"21569", n:"Claudenir José da Silva"}, {b:"Toledo", c:"21748", n:"Diego Rogério de Oliveira Pava"}, {b:"Toledo", c:"21676", n:"Gilmar Leocadio Alves"}, {b:"Toledo", c:"21485", n:"José Lucas Barbosa"}, {b:"Toledo", c:"1834", n:"Luciano Nunes da Silva"}, {b:"Toledo", c:"21670", n:"Luiz Guilherme Ferreira Pinheiro"}, {b:"Toledo", c:"20438", n:"Marcio Roberto Kelm"}, {b:"Toledo", c:"20879", n:"Nilton Batista Maciel"}, {b:"Toledo", c:"21468", n:"Rafael Augusto de Oliveira"}, {b:"Toledo", c:"21349", n:"Valmir Dechotti"}
+        ];
+
+        // --- SISTEMA DE DADOS DINÂMICOS ---
+        // Estrutura: { "2025-11-11": { cad_123: { status: "OK", approver: "Kaio", date: "...", obs: "..." } } }
+        let db = {}; 
+        let currentApprover = "";
+        let currentDateKey = "";
+
+        window.onload = function() {
+            // 1. Carregar Banco de Dados Local
+            const savedDB = localStorage.getItem('pontoDiarioDB');
+            if (savedDB) db = JSON.parse(savedDB);
+
+            const savedApprover = localStorage.getItem('approverName');
+            if (savedApprover) {
+                document.getElementById('approverName').value = savedApprover;
+                currentApprover = savedApprover;
+            }
+
+            // 2. Definir Data Inicial (Hoje)
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('datePicker').value = today;
+            
+            loadDate();
+        };
+
+        function saveConfig() {
+            currentApprover = document.getElementById('approverName').value;
+            localStorage.setItem('approverName', currentApprover);
+        }
+
+        function loadDate() {
+            currentDateKey = document.getElementById('datePicker').value;
+            if (!currentDateKey) return;
+
+            renderTable();
+        }
+
+        // --- RENDERIZAÇÃO ---
+        function renderTable() {
+            const container = document.getElementById('tableContainer');
+            container.innerHTML = "";
+
+            let countOK = 0;
+            let countPending = 0;
+
+            // Agrupar por Filial
+            const groups = {};
+            driverList.forEach(d => {
+                if(!groups[d.b]) groups[d.b] = [];
+                groups[d.b].push(d);
+            });
+
+            // Dados salvos para o dia atual
+            const dayRecords = db[currentDateKey] || {};
+
+            for (const [branch, drivers] of Object.entries(groups)) {
+                const block = document.createElement('div');
+                block.className = 'branch-block';
+
+                let html = `
+                    <div class="branch-head">
+                        <span class="branch-name"><i class="fas fa-building"></i> ${branch}</span>
+                        <button class="btn-branch-approve" onclick="approveBranch('${branch}')">
+                            <i class="fas fa-check"></i> Aprovar Filial
+                        </button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="10%">CAD</th>
+                                <th width="25%">Nome</th>
+                                <th width="15%">Status</th>
+                                <th width="20%">Observação (Quem autorizou?)</th>
+                                <th width="15%">Aprovador</th>
+                                <th width="15%">Hora Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                drivers.forEach(d => {
+                    const record = dayRecords[d.c]; // Busca pelo CAD
+                    const status = record ? record.status : "Pendente";
+                    const obs = record ? record.obs : "";
+                    const approver = record ? record.approver : "-";
+                    const time = record ? record.time : "-";
+
+                    // Contagem
+                    if (status === 'OK') countOK++;
+                    else countPending++;
+
+                    let badgeClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : 'st-pendente');
+                    let statusLabel = status === 'OK' ? 'Aprovado' : (status === 'Erro' ? 'Reprovado' : 'Pendente');
+
+                    html += `
+                        <tr>
+                            <td><b>${d.c}</b></td>
+                            <td>${d.n}</td>
+                            <td>
+                                <span class="status-badge ${badgeClass}" onclick="cycleStatus('${d.c}')">${statusLabel}</span>
+                            </td>
+                            <td>
+                                <input type="text" class="obs-input" placeholder="..." 
+                                value="${obs}" onblur="saveObs('${d.c}', this.value)">
+                            </td>
+                            <td style="color:var(--brand); font-weight:bold; font-size:11px;">${approver}</td>
+                            <td style="font-size:11px; color:#999;">${time}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `</tbody></table>`;
+                block.innerHTML = html;
+                container.appendChild(block);
+            }
+
+            // Atualizar contadores
+            document.getElementById('count-ok').innerText = countOK;
+            document.getElementById('count-pending').innerText = countPending;
+            document.getElementById('count-total').innerText = driverList.length;
+        }
+
+        // --- LÓGICA DE DADOS ---
+
+        function saveData() {
+            localStorage.setItem('pontoDiarioDB', JSON.stringify(db));
+            renderTable();
+        }
+
+        function cycleStatus(cad) {
+            if (!currentApprover) { alert("Digite seu nome no topo antes de aprovar!"); return; }
+
+            // Inicializa o dia se não existir
+            if (!db[currentDateKey]) db[currentDateKey] = {};
+
+            const current = db[currentDateKey][cad] ? db[currentDateKey][cad].status : "Pendente";
+            let next = "OK";
+            if (current === "OK") next = "Erro";
+            else if (current === "Erro") next = "Pendente";
+
+            // Se voltar para pendente, limpa dados
+            if (next === "Pendente") {
+                delete db[currentDateKey][cad];
+            } else {
+                // Preserva obs se existir
+                const existingObs = db[currentDateKey][cad] ? db[currentDateKey][cad].obs : "";
+                
+                db[currentDateKey][cad] = {
+                    status: next,
+                    approver: currentApprover,
+                    time: new Date().toLocaleTimeString('pt-BR'),
+                    obs: existingObs
+                };
+            }
+            saveData();
+        }
+
+        function saveObs(cad, text) {
+            if (!db[currentDateKey]) db[currentDateKey] = {};
+            
+            // Se o registro não existe, cria como pendente mas com obs
+            if (!db[currentDateKey][cad]) {
+                db[currentDateKey][cad] = {
+                    status: "Pendente",
+                    approver: "-",
+                    time: "-",
+                    obs: text
+                };
+            } else {
+                db[currentDateKey][cad].obs = text;
+            }
+            localStorage.setItem('pontoDiarioDB', JSON.stringify(db));
+        }
+
+        function approveBranch(branchName) {
+            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
+            if (!confirm(`Aprovar TODOS da filial ${branchName} para o dia ${currentDateKey}?`)) return;
+
+            if (!db[currentDateKey]) db[currentDateKey] = {};
+            const timeNow = new Date().toLocaleTimeString('pt-BR');
+
+            driverList.forEach(d => {
+                if (d.b === branchName) {
+                    // Mantém observação existente se houver
+                    const existingObs = db[currentDateKey][d.c] ? db[currentDateKey][d.c].obs : "";
+                    
+                    db[currentDateKey][d.c] = {
+                        status: "OK",
+                        approver: currentApprover,
+                        time: timeNow,
+                        obs: existingObs
+                    };
+                }
+            });
+            saveData();
+        }
+
+        function approveAllDaily() {
+            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
+            if (!confirm(`TEM CERTEZA? Isso aprovará TODOS os ${driverList.length} motoristas para o dia ${currentDateKey}.`)) return;
+
+            if (!db[currentDateKey]) db[currentDateKey] = {};
+            const timeNow = new Date().toLocaleTimeString('pt-BR');
+
+            driverList.forEach(d => {
+                const existingObs = db[currentDateKey][d.c] ? db[currentDateKey][d.c].obs : "";
+                db[currentDateKey][d.c] = {
+                    status: "OK",
+                    approver: currentApprover,
+                    time: timeNow,
+                    obs: existingObs
+                };
+            });
+            saveData();
+        }
+
+        function clearDay() {
+            if (!confirm(`Limpar todas as aprovações do dia ${currentDateKey}? (Isso não afeta outros dias)`)) return;
+            delete db[currentDateKey];
+            saveData();
+        }
+
+        // --- EXPORTAÇÃO ---
+        function exportDay() {
+            let csv = "Filial;CAD;Nome;Data Referencia;Status;Observacao;Aprovador;Hora Acao\n";
+            const dayData = db[currentDateKey] || {};
+
+            driverList.forEach(d => {
+                const rec = dayData[d.c];
+                const st = rec ? rec.status : "Pendente";
+                const obs = rec ? rec.obs : "";
+                const app = rec ? rec.approver : "";
+                const time = rec ? rec.time : "";
+                
+                csv += `${d.b};${d.c};${d.n};${currentDateKey};${st};${obs};${app};${time}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `Ponto_Dia_${currentDateKey}.csv`;
+            link.click();
+        }
+
+    </script>
+</body>
+</html>
