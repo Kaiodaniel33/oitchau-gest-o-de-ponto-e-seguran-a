@@ -15,7 +15,7 @@
             --period-btn: #6f42c1; /* Roxo para ações em lote */
             --manage-btn: #fd7e14; /* Laranja para gestão */
             --excel-day: #218838;  /* Verde Padrão */
-            --excel-period: #1e7e34; /* Verde Escuro */
+            --excel-period: #115722; /* Verde Escuro */
         }
 
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
@@ -61,7 +61,7 @@
         .btn-period-action { background: var(--period-btn); }
         .btn-manage { background: var(--manage-btn); }
         .btn-excel-day { background: var(--excel-day); }
-        .btn-excel-period { background: var(--excel-period); border: 1px solid #145523; }
+        .btn-excel-period { background: var(--excel-period); border: 1px solid #0d421a; }
 
         /* --- SUMMARY BAR --- */
         .summary-bar {
@@ -138,21 +138,21 @@
     <div class="top-panel">
         <div class="title-box">
             <h1><i class="fas fa-check-circle"></i> Controle Diário de Ponto - Oitchau</h1>
-            <p>Aprovação, Gestão e Relatórios</p>
+            <p>Sistema Integrado de Aprovação</p>
         </div>
 
         <div class="control-group">
-            <label>Selecione o Dia</label>
+            <label>Data de Referência</label>
             <input type="date" id="datePicker" onchange="loadDate()">
         </div>
 
         <div class="control-group">
-            <label>Quem está aprovando?</label>
+            <label>Aprovador</label>
             <input type="text" id="approverName" placeholder="Seu nome (Ex: Kaio)" onchange="saveConfig()">
         </div>
 
         <div class="control-group">
-            <label>Ações Rápidas</label>
+            <label>Ações</label>
             <div class="btn-row">
                 <button class="btn btn-save" onclick="approveAllDaily()" title="Aprovar tela atual">
                     <i class="fas fa-check-double"></i> Dia
@@ -170,13 +170,13 @@
         </div>
 
         <div class="control-group">
-            <label>Relatórios Excel</label>
+            <label>Exportar Excel</label>
             <div class="btn-row">
                 <button class="btn btn-excel-day" onclick="exportDay()">
-                    <i class="fas fa-file-excel"></i> Baixar Dia
+                    <i class="fas fa-file-excel"></i> Dia Atual
                 </button>
                 <button class="btn btn-excel-period" onclick="exportPeriodSheet()">
-                    <i class="fas fa-file-csv"></i> Baixar Período (11-10)
+                    <i class="fas fa-table"></i> Período (Matriz)
                 </button>
             </div>
         </div>
@@ -221,7 +221,7 @@
     </div>
 
     <script>
-        // --- BASE DE DADOS PADRÃO ---
+        // --- DADOS INICIAIS ---
         const defaultDriverList = [
             {b:"Apucarana", c:"21001", n:"Anderson Patrício Schatz"}, {b:"Apucarana", c:"19999", n:"Antonio Gomes de Lima"}, {b:"Apucarana", c:"21672", n:"João Marcos Balachi"}, {b:"Apucarana", c:"9213", n:"Olímpio Pereira da Silva"}, {b:"Apucarana", c:"21474", n:"Ricardo Hikazutani Marques"},
             {b:"Araraquara", c:"2037", n:"Ademilson Jesus da Silva"}, {b:"Araraquara", c:"1968", n:"Anderson Lucas Vieira Rocha"}, {b:"Araraquara", c:"1974", n:"Alexsandro Brito Meira Rodrigues"}, {b:"Araraquara", c:"1843", n:"Anailson Nunes dos Santos"}, {b:"Araraquara", c:"1880", n:"Antonio Fernando de Alencar"}, {b:"Araraquara", c:"1760", n:"Amilton Teixeira dos Santos"}, {b:"Araraquara", c:"1969", n:"Dayvison Bruno Marcelino da Silva"}, {b:"Araraquara", c:"1995", n:"José Adelso Pereira Alves"}, {b:"Araraquara", c:"2071", n:"Luiz Fernando Munhoz Torres"}, {b:"Araraquara", c:"2042", n:"Michel de Araújo dos Santos"}, {b:"Araraquara", c:"1410", n:"Pedro Luiz da Silva"}, {b:"Araraquara", c:"2100", n:"Tiago Pereira da Silva Santos"},
@@ -248,7 +248,6 @@
             {b:"Toledo", c:"1908", n:"Alexsandro dos Santos de Souza"}, {b:"Toledo", c:"20572", n:"Calaudino Ribeiro"}, {b:"Toledo", c:"1852", n:"Calil Ferreira Ramos"}, {b:"Toledo", c:"19102", n:"Carlos Roberto Santos"}, {b:"Toledo", c:"21569", n:"Claudenir José da Silva"}, {b:"Toledo", c:"21748", n:"Diego Rogério de Oliveira Pava"}, {b:"Toledo", c:"21676", n:"Gilmar Leocadio Alves"}, {b:"Toledo", c:"21485", n:"José Lucas Barbosa"}, {b:"Toledo", c:"1834", n:"Luciano Nunes da Silva"}, {b:"Toledo", c:"21670", n:"Luiz Guilherme Ferreira Pinheiro"}, {b:"Toledo", c:"20438", n:"Marcio Roberto Kelm"}, {b:"Toledo", c:"20879", n:"Nilton Batista Maciel"}, {b:"Toledo", c:"21468", n:"Rafael Augusto de Oliveira"}, {b:"Toledo", c:"21349", n:"Valmir Dechotti"}
         ];
 
-        // --- SISTEMA DE DADOS DINÂMICOS ---
         let driverList = [];
         let db = {}; 
         let currentApprover = "";
@@ -284,7 +283,11 @@
         }
 
         function sortDriverList() {
-            driverList.sort((a, b) => a.n.localeCompare(b.n));
+            driverList.sort((a, b) => {
+                if (a.b < b.b) return -1;
+                if (a.b > b.b) return 1;
+                return a.n.localeCompare(b.n);
+            });
         }
 
         function saveDriverList() {
@@ -296,11 +299,10 @@
         function loadDate() {
             currentDateKey = document.getElementById('datePicker').value;
             if (!currentDateKey) return;
-
             renderTable();
         }
 
-        // --- RENDERIZAÇÃO ---
+        // --- RENDERIZAÇÃO TELA PRINCIPAL ---
         function renderTable() {
             const container = document.getElementById('tableContainer');
             container.innerHTML = "";
@@ -392,7 +394,6 @@
 
         function cycleStatus(cad) {
             if (!currentApprover) { alert("Digite o nome de quem está aprovando no topo!"); return; }
-
             if (!db[currentDateKey]) db[currentDateKey] = {};
 
             const current = db[currentDateKey][cad] ? db[currentDateKey][cad].status : "Pendente";
@@ -404,7 +405,6 @@
                 delete db[currentDateKey][cad];
             } else {
                 const existingObs = db[currentDateKey][cad] ? db[currentDateKey][cad].obs : "";
-                
                 db[currentDateKey][cad] = {
                     status: next,
                     approver: currentApprover,
@@ -471,12 +471,12 @@
         }
 
         function clearDay() {
-            if (!confirm(`Limpar todas as aprovações do dia ${currentDateKey}? (Isso não afeta outros dias)`)) return;
+            if (!confirm(`Limpar todas as aprovações do dia ${currentDateKey}?`)) return;
             delete db[currentDateKey];
             saveData();
         }
 
-        // --- LÓGICA DE PERÍODO (11 a 10) ---
+        // --- LÓGICA DE PERÍODO ---
 
         function getPeriodLimits(dateStr) {
             const current = new Date(dateStr + "T12:00:00");
@@ -502,10 +502,9 @@
             const startStr = limits.start.toLocaleDateString('pt-BR');
             const endStr = limits.end.toLocaleDateString('pt-BR');
 
-            if (!confirm(`Aprovar TUDO para o período de ${startStr} até ${endStr}? Isso vai gerar aprovação em todos os dias.`)) return;
+            if (!confirm(`Aprovar TUDO para o período de ${startStr} até ${endStr}?`)) return;
 
             const timeNow = new Date().toLocaleTimeString('pt-BR');
-            
             let loopDate = new Date(limits.start);
             while (loopDate <= limits.end) {
                 const dateKey = loopDate.toISOString().split('T')[0];
@@ -522,23 +521,18 @@
                 });
                 loopDate.setDate(loopDate.getDate() + 1);
             }
-            
             localStorage.setItem('pontoDiarioDB', JSON.stringify(db));
             alert("Período aprovado com sucesso!");
             renderTable();
         }
 
-        // --- GESTÃO DE EQUIPE (Modal) ---
-        
+        // --- GESTÃO DE EQUIPE ---
         function openManageModal() {
             document.getElementById('manageModal').style.display = 'flex';
             renderBranchOptions();
             renderManageList();
         }
-
-        function closeManageModal() {
-            document.getElementById('manageModal').style.display = 'none';
-        }
+        function closeManageModal() { document.getElementById('manageModal').style.display = 'none'; }
 
         function renderBranchOptions() {
             const branches = [...new Set(driverList.map(d => d.b))].sort();
@@ -556,26 +550,19 @@
             const cad = document.getElementById('newCad').value.trim();
             const branch = document.getElementById('newBranch').value;
             const name = document.getElementById('newName').value.trim();
-
             if (!cad || !branch || !name) { alert("Preencha todos os campos!"); return; }
-
             const exists = driverList.find(d => d.c === cad);
-            if (exists) { alert("Erro: Já existe um funcionário com este Cadastro (CAD)!"); return; }
-
+            if (exists) { alert("Erro: Cadastro (CAD) já existe!"); return; }
             driverList.push({ b: branch, c: cad, n: name });
             document.getElementById('newCad').value = "";
             document.getElementById('newName').value = "";
-            
-            saveDriverList();
-            renderManageList();
-            alert("Funcionário adicionado!");
+            saveDriverList(); renderManageList(); alert("Funcionário adicionado!");
         }
 
         function removeDriver(cad) {
-            if (!confirm("Tem certeza que deseja remover este funcionário?")) return;
+            if (!confirm("Remover funcionário?")) return;
             driverList = driverList.filter(d => d.c !== cad);
-            saveDriverList();
-            renderManageList();
+            saveDriverList(); renderManageList();
         }
 
         function renderManageList() {
@@ -591,51 +578,63 @@
 
         // --- EXPORTAÇÃO EXCEL (DIA) ---
         function exportDay() {
-            // Cabeçalho CSV com BOM para o Excel ler acentos
+            sortDriverList();
             let csv = "\ufeffFilial;CAD;Nome;Data Referencia;Status;Observacao;Aprovador;Hora Acao\n";
             const dayData = db[currentDateKey] || {};
-
             driverList.forEach(d => {
                 const rec = dayData[d.c];
-                // Se não tem registro, é pendente
                 const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : 'Pendente')) : "Pendente";
                 const obs = rec ? rec.obs : "";
                 const app = rec ? rec.approver : "";
                 const time = rec ? rec.time : "";
-                
                 csv += `${d.b};${d.c};${d.n};${currentDateKey};${st};${obs};${app};${time}\n`;
             });
-
             downloadCSV(csv, `Ponto_Dia_${currentDateKey}.csv`);
         }
 
-        // --- EXPORTAÇÃO EXCEL (PERÍODO) ---
+        // --- EXPORTAÇÃO EXCEL (MATRIZ / HORIZONTAL) ---
         function exportPeriodSheet() {
+            sortDriverList(); // Garante ordem Apucarana -> Z
+
             const limits = getPeriodLimits(currentDateKey);
-            const startStr = limits.start.toLocaleDateString('pt-BR');
-            const endStr = limits.end.toLocaleDateString('pt-BR');
-
-            let csv = "\ufeffData;Filial;CAD;Nome;Status;Observacao;Aprovador;Hora Acao\n";
             
-            let loopDate = new Date(limits.start);
-            while (loopDate <= limits.end) {
-                const dateKey = loopDate.toISOString().split('T')[0];
-                const dayData = db[dateKey] || {};
-
-                driverList.forEach(d => {
-                    const rec = dayData[d.c];
-                    const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : 'Pendente')) : "Pendente";
-                    const obs = rec ? rec.obs : "";
-                    const app = rec ? rec.approver : "";
-                    const time = rec ? rec.time : "";
-                    
-                    csv += `${dateKey};${d.b};${d.c};${d.n};${st};${obs};${app};${time}\n`;
-                });
-
-                loopDate.setDate(loopDate.getDate() + 1);
+            // 1. Gerar Cabeçalho com Datas (Dia 11 até Dia 10)
+            let header = "Filial;CAD;Nome";
+            const dateArray = [];
+            let curr = new Date(limits.start);
+            
+            while (curr <= limits.end) {
+                // Guarda data para uso posterior
+                dateArray.push(new Date(curr));
+                // Formata cabeçalho (ex: 11/01)
+                const dayStr = curr.getDate().toString().padStart(2, '0');
+                const monthStr = (curr.getMonth() + 1).toString().padStart(2, '0');
+                header += `;${dayStr}/${monthStr}`;
+                
+                curr.setDate(curr.getDate() + 1);
             }
+            header += "\n";
 
-            downloadCSV(csv, `Ponto_Periodo_${startStr}_a_${endStr}.csv`);
+            // 2. Preencher Linhas (Uma por funcionário)
+            let body = "";
+            driverList.forEach(driver => {
+                let row = `${driver.b};${driver.c};${driver.n}`;
+
+                // Loop pelas colunas de data
+                dateArray.forEach(d => {
+                    const dateKey = d.toISOString().split('T')[0];
+                    const dayData = db[dateKey] || {};
+                    const record = dayData[driver.c];
+                    
+                    // Status simples
+                    const status = record ? (record.status === 'OK' ? 'Aprovado' : (record.status === 'Erro' ? 'Reprovado' : 'Pendente')) : 'Pendente';
+                    row += `;${status}`;
+                });
+                body += row + "\n";
+            });
+
+            const fileName = `Matriz_Ponto_${limits.start.toLocaleDateString('pt-BR')}_a_${limits.end.toLocaleDateString('pt-BR')}.csv`;
+            downloadCSV("\ufeff" + header + body, fileName);
         }
 
         function downloadCSV(content, fileName) {
