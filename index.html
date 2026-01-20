@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle Diário de Ponto - Oitchau (Online)</title>
+    <title>Controle Diário - Oitchau (Presidente Edition)</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -43,6 +43,7 @@
         .btn-manage { background: var(--manage-btn); }
         .btn-excel-day { background: var(--excel-day); }
         .btn-excel-period { background: var(--excel-period); border: 1px solid #0d421a; }
+        .btn-individual { background: #6610f2; border: 1px solid #520dc2; } /* Novo Botão Roxo Escuro */
 
         /* SUMMARY */
         .summary-bar { display: flex; gap: 15px; margin-bottom: 20px; }
@@ -75,6 +76,13 @@
         .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
         .modal-header h2 { margin: 0; font-size: 18px; color: var(--manage-btn); }
         .close-btn { cursor: pointer; font-weight: bold; color: #999; }
+        
+        /* Modal Individual */
+        .individual-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .individual-actions button { flex: 1; padding: 15px; font-size: 14px; justify-content: center; }
+        .date-range-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .date-range-row div { flex: 1; }
+
         .add-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
         .add-form input, .add-form select { width: 100%; box-sizing: border-box; }
         .full-width { grid-column: span 2; }
@@ -88,7 +96,7 @@
 
     <div class="top-panel">
         <div class="title-box">
-            <h1><i class="fas fa-check-circle"></i> Controle Diário - Oitchau</h1>
+            <h1><i class="fas fa-check-circle"></i> Controle Oitchau</h1>
             <p>Conectado ao Servidor: oitchauserv</p>
             <div id="connectionStatus" class="status-connection status-offline"><i class="fas fa-circle"></i> Conectando...</div>
         </div>
@@ -104,31 +112,31 @@
         </div>
 
         <div class="control-group">
-            <label>Ações</label>
+            <label>Ações em Massa</label>
             <div class="btn-row">
                 <button class="btn btn-save" onclick="approveAllDaily()" title="Aprovar tela atual">
-                    <i class="fas fa-check-double"></i> Dia
+                    <i class="fas fa-check-double"></i> Dia Todos
                 </button>
-                <button class="btn btn-period-action" onclick="approvePeriod()" title="Aprovar de 11 a 10">
-                    <i class="fas fa-calendar-alt"></i> Período
+                <button class="btn btn-period-action" onclick="approvePeriod()" title="Aprovar Todos (11 a 10)">
+                    <i class="fas fa-calendar-alt"></i> Período Todos
                 </button>
-                <button class="btn btn-manage" onclick="openManageModal()" title="Add/Remover Pessoas">
-                    <i class="fas fa-users-cog"></i> Equipe
-                </button>
-                <button class="btn btn-trash" onclick="clearDay()" title="Limpar aprovações deste dia">
-                    <i class="fas fa-eraser"></i>
+                <button class="btn btn-individual" onclick="openIndividualModal()" title="Aprovar só um cara por período">
+                    <i class="fas fa-user-clock"></i> Período Individual
                 </button>
             </div>
         </div>
 
         <div class="control-group">
-            <label>Exportar Excel</label>
+            <label>Gestão & Excel</label>
             <div class="btn-row">
+                <button class="btn btn-manage" onclick="openManageModal()">
+                    <i class="fas fa-users-cog"></i> Equipe
+                </button>
                 <button class="btn btn-excel-day" onclick="exportDay()">
-                    <i class="fas fa-file-excel"></i> Dia Atual
+                    <i class="fas fa-file-excel"></i> Dia
                 </button>
                 <button class="btn btn-excel-period" onclick="exportPeriodSheet()">
-                    <i class="fas fa-table"></i> Período (Matriz)
+                    <i class="fas fa-table"></i> Matriz
                 </button>
             </div>
         </div>
@@ -157,7 +165,6 @@
                 <h2><i class="fas fa-user-plus"></i> Gerenciar Equipe</h2>
                 <span class="close-btn" onclick="closeManageModal()">✕</span>
             </div>
-
             <div class="add-form">
                 <input type="text" id="newCad" placeholder="Cadastro (CAD)">
                 <select id="newBranch">
@@ -166,8 +173,47 @@
                 <input type="text" id="newName" class="full-width" placeholder="Nome Completo">
                 <button class="btn btn-save full-width" onclick="addDriver()">+ Adicionar Pessoa</button>
             </div>
-
             <div class="manage-list" id="manageListContainer"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="individualModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="color: #6610f2;"><i class="fas fa-user-clock"></i> Ação Individual por Período</h2>
+                <span class="close-btn" onclick="closeIndividualModal()">✕</span>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <label>1. Selecione o Colaborador:</label>
+                <select id="indivDriverSelect" style="width:100%; font-weight:bold;">
+                    <option value="">Carregando...</option>
+                </select>
+
+                <div class="date-range-row">
+                    <div>
+                        <label>2. Data Inicial:</label>
+                        <input type="date" id="indivStartDate" style="width:100%">
+                    </div>
+                    <div>
+                        <label>3. Data Final:</label>
+                        <input type="date" id="indivEndDate" style="width:100%">
+                    </div>
+                </div>
+
+                <label>4. Escolha a Ação para este intervalo:</label>
+                <div class="individual-actions">
+                    <button class="btn btn-save" onclick="applyIndividualAction('OK')">
+                        <i class="fas fa-check"></i> APROVAR
+                    </button>
+                    <button class="btn btn-trash" onclick="applyIndividualAction('Erro')">
+                        <i class="fas fa-times"></i> REPROVAR
+                    </button>
+                    <button class="btn" style="background:#888;" onclick="applyIndividualAction('Pendente')">
+                        <i class="fas fa-eraser"></i> LIMPAR
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -175,7 +221,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
     <script>
-        // --- SEU SERVIDOR (Configuração) ---
+        // --- CONFIGURAÇÃO ---
         const firebaseConfig = {
             apiKey: "AIzaSyAJY7pPpxurwbiIhjjDfsPh0NPyuO_vNi8",
             authDomain: "oitchauserv.firebaseapp.com",
@@ -185,7 +231,6 @@
             appId: "1:670263819451:web:08addbf9f8c2b8d78dbd9e"
         };
 
-        // Inicializa Firebase
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         const dbRef = database.ref('pontos');
@@ -225,26 +270,21 @@
 
         // --- INICIALIZAÇÃO ---
         window.onload = function() {
-            // Recupera Aprovador
             const savedApprover = localStorage.getItem('approverName');
             if (savedApprover) {
                 document.getElementById('approverName').value = savedApprover;
                 currentApprover = savedApprover;
             }
 
-            // Data de hoje
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('datePicker').value = today;
             
-            // --- CONEXÃO COM FIREBASE (Escuta em Tempo Real) ---
-            
-            // 1. Escutar a Lista de Equipe
+            // CONEXÃO FIREBASE
             driversRef.on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
                     driverList = data;
                 } else {
-                    // Banco vazio? Usa lista padrão e envia para nuvem
                     driverList = defaultDriverList;
                     driversRef.set(defaultDriverList);
                 }
@@ -252,7 +292,6 @@
                 renderTable();
             });
 
-            // 2. Escutar os Pontos
             dbRef.on('value', (snapshot) => {
                 const data = snapshot.val();
                 db = data || {};
@@ -261,7 +300,6 @@
             }, (error) => {
                 console.error(error);
                 updateStatus(false);
-                alert("Erro ao conectar: Verifique se as REGRAS do banco estão como 'true' no site do Firebase.");
             });
 
             loadDate();
@@ -278,8 +316,7 @@
             }
         }
 
-        // --- FUNÇÕES DE LÓGICA ---
-
+        // --- LÓGICA PRINCIPAL ---
         function saveConfig() {
             currentApprover = document.getElementById('approverName').value;
             localStorage.setItem('approverName', currentApprover);
@@ -307,7 +344,6 @@
             let countOK = 0;
             let countPending = 0;
 
-            // Agrupar por filial
             const groups = {};
             driverList.forEach(d => {
                 if(!groups[d.b]) groups[d.b] = [];
@@ -383,92 +419,54 @@
             document.getElementById('count-total').innerText = driverList.length;
         }
 
-        // --- AÇÕES COM FIREBASE ---
-
+        // --- FIREBASE ACTIONS ---
         function cycleStatus(cad) {
             if (!currentApprover) { alert("Digite o nome de quem está aprovando no topo!"); return; }
-            
             const currentRecord = (db[currentDateKey] && db[currentDateKey][cad]) ? db[currentDateKey][cad] : null;
             const currentStatus = currentRecord ? currentRecord.status : "Pendente";
-            
             let next = "OK";
             if (currentStatus === "OK") next = "Erro";
             else if (currentStatus === "Erro") next = "Pendente";
-
             const path = `pontos/${currentDateKey}/${cad}`;
-
-            if (next === "Pendente") {
-                database.ref(path).remove();
-            } else {
-                const existingObs = currentRecord ? currentRecord.obs : "";
-                database.ref(path).set({
-                    status: next,
-                    approver: currentApprover,
-                    time: new Date().toLocaleTimeString('pt-BR'),
-                    obs: existingObs
-                });
-            }
+            if (next === "Pendente") database.ref(path).remove();
+            else database.ref(path).set({ status: next, approver: currentApprover, time: new Date().toLocaleTimeString('pt-BR'), obs: currentRecord ? currentRecord.obs : "" });
         }
 
         function saveObs(cad, text) {
             const path = `pontos/${currentDateKey}/${cad}`;
             const currentRecord = (db[currentDateKey] && db[currentDateKey][cad]) ? db[currentDateKey][cad] : null;
-
-            if (!currentRecord) {
-                 database.ref(path).set({
-                    status: "Pendente",
-                    approver: "-",
-                    time: "-",
-                    obs: text
-                });
-            } else {
-                database.ref(path).update({ obs: text });
-            }
+            if (!currentRecord) database.ref(path).set({ status: "Pendente", approver: "-", time: "-", obs: text });
+            else database.ref(path).update({ obs: text });
         }
 
         function approveBranch(branchName) {
             if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
-            if (!confirm(`Aprovar TODOS da filial ${branchName} para o dia ${currentDateKey}?`)) return;
-
+            if (!confirm(`Aprovar TODOS da filial ${branchName}?`)) return;
             const timeNow = new Date().toLocaleTimeString('pt-BR');
             const updates = {};
-
             driverList.forEach(d => {
                 if (d.b === branchName) {
                     const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
-                    updates[`pontos/${currentDateKey}/${d.c}`] = {
-                        status: "OK",
-                        approver: currentApprover,
-                        time: timeNow,
-                        obs: currentObs
-                    };
+                    updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, obs: currentObs };
                 }
             });
-
             database.ref().update(updates);
         }
 
         function approveAllDaily() {
             if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
-            if (!confirm(`TEM CERTEZA? Isso aprovará TODOS os ${driverList.length} motoristas para o dia ${currentDateKey}.`)) return;
-
+            if (!confirm(`Aprovar TODOS para o dia ${currentDateKey}?`)) return;
             const timeNow = new Date().toLocaleTimeString('pt-BR');
             const updates = {};
-
             driverList.forEach(d => {
                 const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
-                updates[`pontos/${currentDateKey}/${d.c}`] = {
-                    status: "OK",
-                    approver: currentApprover,
-                    time: timeNow,
-                    obs: currentObs
-                };
+                updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, obs: currentObs };
             });
             database.ref().update(updates);
         }
 
         function clearDay() {
-            if (!confirm(`Limpar todas as aprovações do dia ${currentDateKey}?`)) return;
+            if (!confirm(`Limpar dia ${currentDateKey}?`)) return;
             database.ref(`pontos/${currentDateKey}`).remove();
         }
 
@@ -477,67 +475,46 @@
             const day = current.getDate();
             const month = current.getMonth(); 
             const year = current.getFullYear();
-
             let start, end;
-            if (day >= 11) {
-                start = new Date(year, month, 11);
-                end = new Date(year, month + 1, 10);
-            } else {
-                start = new Date(year, month - 1, 11);
-                end = new Date(year, month, 10);
-            }
+            if (day >= 11) { start = new Date(year, month, 11); end = new Date(year, month + 1, 10); }
+            else { start = new Date(year, month - 1, 11); end = new Date(year, month, 10); }
             return { start, end };
         }
 
         function approvePeriod() {
             if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
-            
             const limits = getPeriodLimits(currentDateKey);
-            const startStr = limits.start.toLocaleDateString('pt-BR');
-            const endStr = limits.end.toLocaleDateString('pt-BR');
-
-            if (!confirm(`Aprovar TUDO para o período de ${startStr} até ${endStr}?`)) return;
-
+            if (!confirm(`Aprovar TUDO de ${limits.start.toLocaleDateString('pt-BR')} até ${limits.end.toLocaleDateString('pt-BR')}?`)) return;
             const timeNow = new Date().toLocaleTimeString('pt-BR');
             const updates = {};
-
             let loopDate = new Date(limits.start);
             while (loopDate <= limits.end) {
                 const dateKey = loopDate.toISOString().split('T')[0];
-                
                 driverList.forEach(d => {
                     const currentObs = (db[dateKey] && db[dateKey][d.c]) ? db[dateKey][d.c].obs : "";
-                    updates[`pontos/${dateKey}/${d.c}`] = {
-                        status: "OK",
-                        approver: currentApprover,
-                        time: timeNow,
-                        obs: currentObs
-                    };
+                    updates[`pontos/${dateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, obs: currentObs };
                 });
                 loopDate.setDate(loopDate.getDate() + 1);
             }
-
             database.ref().update(updates);
-            alert("Período enviado para processamento no servidor!");
+            alert("Aprovando período em massa...");
         }
 
         // --- GESTÃO DE EQUIPE ---
         function openManageModal() {
             document.getElementById('manageModal').style.display = 'flex';
-            renderBranchOptions();
+            renderBranchOptions('newBranch');
             renderManageList();
         }
         function closeManageModal() { document.getElementById('manageModal').style.display = 'none'; }
 
-        function renderBranchOptions() {
+        function renderBranchOptions(elemId) {
             const branches = [...new Set(driverList.map(d => d.b))].sort();
-            const select = document.getElementById('newBranch');
+            const select = document.getElementById(elemId);
             select.innerHTML = '<option value="">Selecione a Filial...</option>';
             branches.forEach(b => {
                 const opt = document.createElement('option');
-                opt.value = b;
-                opt.innerText = b;
-                select.appendChild(opt);
+                opt.value = b; opt.innerText = b; select.appendChild(opt);
             });
         }
 
@@ -546,16 +523,11 @@
             const branch = document.getElementById('newBranch').value;
             const name = document.getElementById('newName').value.trim();
             if (!cad || !branch || !name) { alert("Preencha todos os campos!"); return; }
-            
-            const exists = driverList.find(d => d.c === cad);
-            if (exists) { alert("Erro: Cadastro (CAD) já existe!"); return; }
-            
+            if (driverList.find(d => d.c === cad)) { alert("CAD já existe!"); return; }
             const newList = [...driverList, { b: branch, c: cad, n: name }];
             driversRef.set(newList);
-            
-            document.getElementById('newCad').value = "";
-            document.getElementById('newName').value = "";
-            alert("Funcionário adicionado!");
+            document.getElementById('newCad').value = ""; document.getElementById('newName').value = "";
+            alert("Adicionado!");
         }
 
         function removeDriver(cad) {
@@ -573,6 +545,75 @@
                 item.innerHTML = `<span><b>${d.b}</b> - ${d.n} (CAD: ${d.c})</span> <button class="btn-del" onclick="removeDriver('${d.c}')"><i class="fas fa-trash"></i></button>`;
                 listContainer.appendChild(item);
             });
+        }
+
+        // --- NOVA FUNÇÃO: AÇÃO INDIVIDUAL POR PERÍODO ---
+        function openIndividualModal() {
+            document.getElementById('individualModal').style.display = 'flex';
+            const select = document.getElementById('indivDriverSelect');
+            select.innerHTML = '<option value="">Selecione o Colaborador...</option>';
+            
+            // Ordenar lista para facilitar busca
+            const sortedList = [...driverList].sort((a,b) => a.n.localeCompare(b.n));
+            
+            sortedList.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.c;
+                opt.innerText = `${d.n} (${d.b})`;
+                select.appendChild(opt);
+            });
+        }
+        function closeIndividualModal() { document.getElementById('individualModal').style.display = 'none'; }
+
+        function applyIndividualAction(statusType) {
+            const approver = document.getElementById('approverName').value;
+            if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
+
+            const cad = document.getElementById('indivDriverSelect').value;
+            const startVal = document.getElementById('indivStartDate').value;
+            const endVal = document.getElementById('indivEndDate').value;
+
+            if(!cad || !startVal || !endVal) { alert("Preencha todos os campos!"); return; }
+
+            const start = new Date(startVal + "T12:00:00");
+            const end = new Date(endVal + "T12:00:00");
+
+            if(start > end) { alert("Data Inicial não pode ser maior que a Final!"); return; }
+
+            if(!confirm(`Confirmar ação: ${statusType === 'OK' ? 'APROVAR' : (statusType === 'Erro' ? 'REPROVAR' : 'LIMPAR')}\nPara o período selecionado?`)) return;
+
+            const timeNow = new Date().toLocaleTimeString('pt-BR');
+            const updates = {};
+            let loopDate = new Date(start);
+
+            while(loopDate <= end) {
+                const dateKey = loopDate.toISOString().split('T')[0];
+                const path = `pontos/${dateKey}/${cad}`;
+                
+                if(statusType === 'Pendente') {
+                    // Limpar = Remover do banco
+                    updates[path] = null;
+                } else {
+                    // Manter observação se existir
+                    const currentObs = (db[dateKey] && db[dateKey][cad]) ? db[dateKey][cad].obs : "";
+                    updates[path] = {
+                        status: statusType,
+                        approver: approver,
+                        time: timeNow,
+                        obs: currentObs
+                    };
+                }
+                loopDate.setDate(loopDate.getDate() + 1);
+            }
+
+            database.ref().update(updates)
+                .then(() => {
+                    alert("Ação realizada com sucesso!");
+                    closeIndividualModal();
+                })
+                .catch((err) => {
+                    alert("Erro ao salvar: " + err.message);
+                });
         }
 
         // --- EXPORTAR EXCEL ---
