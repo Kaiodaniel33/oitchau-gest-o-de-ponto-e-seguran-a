@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle Diário de Ponto - Oitchau</title>
+    <title>Controle Diário de Ponto - Oitchau (Online)</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -36,6 +36,10 @@
 
         .title-box h1 { margin: 0; color: var(--brand); font-size: 22px; font-weight: 800; }
         .title-box p { margin: 5px 0 0; color: #777; font-size: 12px; }
+        
+        .status-connection { font-size: 11px; margin-top:5px; font-weight: bold; }
+        .status-online { color: #218838; }
+        .status-offline { color: #dc3545; }
 
         .control-group { display: flex; flex-direction: column; }
         label { font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px; text-transform: uppercase; }
@@ -137,8 +141,9 @@
 
     <div class="top-panel">
         <div class="title-box">
-            <h1><i class="fas fa-check-circle"></i> Controle Diário de Ponto - Oitchau</h1>
-            <p>Sistema Integrado de Aprovação</p>
+            <h1><i class="fas fa-check-circle"></i> Controle Diário - Oitchau</h1>
+            <p>Conectado ao Servidor: oitchauserv</p>
+            <div id="connectionStatus" class="status-connection status-offline"><i class="fas fa-circle"></i> Conectando...</div>
         </div>
 
         <div class="control-group">
@@ -216,12 +221,33 @@
             </div>
 
             <div class="manage-list" id="manageListContainer">
-                </div>
+            </div>
         </div>
     </div>
 
-    <script>
-        // --- DADOS INICIAIS ---
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, update, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        // --- SEU SERVIDOR ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAJY7pPpxurwbiIhjjDfsPh0NPyuO_vNi8",
+            authDomain: "oitchauserv.firebaseapp.com",
+            projectId: "oitchauserv",
+            storageBucket: "oitchauserv.firebasestorage.app",
+            messagingSenderId: "670263819451",
+            appId: "1:670263819451:web:08addbf9f8c2b8d78dbd9e"
+        };
+
+        // Inicializa Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        
+        // Referências do Banco
+        const dbRef = ref(database, 'pontos');
+        const driversRef = ref(database, 'equipe');
+
+        // --- DADOS PADRÃO (Caso o banco esteja vazio na primeira vez) ---
         const defaultDriverList = [
             {b:"Apucarana", c:"21001", n:"Anderson Patrício Schatz"}, {b:"Apucarana", c:"19999", n:"Antonio Gomes de Lima"}, {b:"Apucarana", c:"21672", n:"João Marcos Balachi"}, {b:"Apucarana", c:"9213", n:"Olímpio Pereira da Silva"}, {b:"Apucarana", c:"21474", n:"Ricardo Hikazutani Marques"},
             {b:"Araraquara", c:"2037", n:"Ademilson Jesus da Silva"}, {b:"Araraquara", c:"1968", n:"Anderson Lucas Vieira Rocha"}, {b:"Araraquara", c:"1974", n:"Alexsandro Brito Meira Rodrigues"}, {b:"Araraquara", c:"1843", n:"Anailson Nunes dos Santos"}, {b:"Araraquara", c:"1880", n:"Antonio Fernando de Alencar"}, {b:"Araraquara", c:"1760", n:"Amilton Teixeira dos Santos"}, {b:"Araraquara", c:"1969", n:"Dayvison Bruno Marcelino da Silva"}, {b:"Araraquara", c:"1995", n:"José Adelso Pereira Alves"}, {b:"Araraquara", c:"2071", n:"Luiz Fernando Munhoz Torres"}, {b:"Araraquara", c:"2042", n:"Michel de Araújo dos Santos"}, {b:"Araraquara", c:"1410", n:"Pedro Luiz da Silva"}, {b:"Araraquara", c:"2100", n:"Tiago Pereira da Silva Santos"},
@@ -248,23 +274,15 @@
             {b:"Toledo", c:"1908", n:"Alexsandro dos Santos de Souza"}, {b:"Toledo", c:"20572", n:"Calaudino Ribeiro"}, {b:"Toledo", c:"1852", n:"Calil Ferreira Ramos"}, {b:"Toledo", c:"19102", n:"Carlos Roberto Santos"}, {b:"Toledo", c:"21569", n:"Claudenir José da Silva"}, {b:"Toledo", c:"21748", n:"Diego Rogério de Oliveira Pava"}, {b:"Toledo", c:"21676", n:"Gilmar Leocadio Alves"}, {b:"Toledo", c:"21485", n:"José Lucas Barbosa"}, {b:"Toledo", c:"1834", n:"Luciano Nunes da Silva"}, {b:"Toledo", c:"21670", n:"Luiz Guilherme Ferreira Pinheiro"}, {b:"Toledo", c:"20438", n:"Marcio Roberto Kelm"}, {b:"Toledo", c:"20879", n:"Nilton Batista Maciel"}, {b:"Toledo", c:"21468", n:"Rafael Augusto de Oliveira"}, {b:"Toledo", c:"21349", n:"Valmir Dechotti"}
         ];
 
+        // --- VARIÁVEIS GLOBAIS ---
         let driverList = [];
         let db = {}; 
         let currentApprover = "";
         let currentDateKey = "";
 
+        // --- INICIALIZAÇÃO ---
         window.onload = function() {
-            const savedDB = localStorage.getItem('pontoDiarioDB');
-            if (savedDB) db = JSON.parse(savedDB);
-
-            const savedDrivers = localStorage.getItem('driverListDB');
-            if (savedDrivers) {
-                driverList = JSON.parse(savedDrivers);
-            } else {
-                driverList = JSON.parse(JSON.stringify(defaultDriverList));
-            }
-            sortDriverList();
-
+            // Aprovador continua no LocalStorage (preferência local)
             const savedApprover = localStorage.getItem('approverName');
             if (savedApprover) {
                 document.getElementById('approverName').value = savedApprover;
@@ -274,8 +292,59 @@
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('datePicker').value = today;
             
+            // Listener para PONTOS
+            onValue(dbRef, (snapshot) => {
+                const data = snapshot.val();
+                db = data || {};
+                renderTable();
+                updateStatus(true);
+            }, (error) => {
+                updateStatus(false);
+            });
+
+            // Listener para EQUIPE (MOTORISTAS)
+            onValue(driversRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    driverList = data;
+                } else {
+                    // Se o banco estiver vazio, usa a lista padrão e SALVA no banco
+                    driverList = defaultDriverList;
+                    set(driversRef, defaultDriverList);
+                }
+                sortDriverList();
+                renderTable();
+            });
+
             loadDate();
         };
+
+        // Torna as funções acessíveis no HTML global
+        window.saveConfig = saveConfig;
+        window.loadDate = loadDate;
+        window.approveAllDaily = approveAllDaily;
+        window.approvePeriod = approvePeriod;
+        window.openManageModal = openManageModal;
+        window.closeManageModal = closeManageModal;
+        window.clearDay = clearDay;
+        window.exportDay = exportDay;
+        window.exportPeriodSheet = exportPeriodSheet;
+        window.approveBranch = approveBranch;
+        window.cycleStatus = cycleStatus;
+        window.saveObs = saveObs;
+        window.addDriver = addDriver;
+        window.removeDriver = removeDriver;
+
+        function updateStatus(online) {
+            const el = document.getElementById('connectionStatus');
+            if (online) {
+                el.innerHTML = '<i class="fas fa-check-circle"></i> Online e Sincronizado';
+                el.className = 'status-connection status-online';
+            } else {
+                el.innerHTML = '<i class="fas fa-times-circle"></i> Desconectado';
+                el.className = 'status-connection status-offline';
+            }
+        }
 
         function saveConfig() {
             currentApprover = document.getElementById('approverName').value;
@@ -290,12 +359,6 @@
             });
         }
 
-        function saveDriverList() {
-            sortDriverList();
-            localStorage.setItem('driverListDB', JSON.stringify(driverList));
-            renderTable();
-        }
-
         function loadDate() {
             currentDateKey = document.getElementById('datePicker').value;
             if (!currentDateKey) return;
@@ -305,6 +368,7 @@
         // --- RENDERIZAÇÃO TELA PRINCIPAL ---
         function renderTable() {
             const container = document.getElementById('tableContainer');
+            if(!container) return;
             container.innerHTML = "";
 
             let countOK = 0;
@@ -385,95 +449,96 @@
             document.getElementById('count-total').innerText = driverList.length;
         }
 
-        // --- LÓGICA DE DADOS ---
-
-        function saveData() {
-            localStorage.setItem('pontoDiarioDB', JSON.stringify(db));
-            renderTable();
-        }
+        // --- LÓGICA DE DADOS (FIREBASE) ---
 
         function cycleStatus(cad) {
             if (!currentApprover) { alert("Digite o nome de quem está aprovando no topo!"); return; }
-            if (!db[currentDateKey]) db[currentDateKey] = {};
-
-            const current = db[currentDateKey][cad] ? db[currentDateKey][cad].status : "Pendente";
+            
+            // Pega estado atual
+            const currentRecord = (db[currentDateKey] && db[currentDateKey][cad]) ? db[currentDateKey][cad] : null;
+            const currentStatus = currentRecord ? currentRecord.status : "Pendente";
+            
             let next = "OK";
-            if (current === "OK") next = "Erro";
-            else if (current === "Erro") next = "Pendente";
+            if (currentStatus === "OK") next = "Erro";
+            else if (currentStatus === "Erro") next = "Pendente";
+
+            const path = `pontos/${currentDateKey}/${cad}`;
 
             if (next === "Pendente") {
-                delete db[currentDateKey][cad];
+                // Remove o nó do Firebase
+                remove(ref(database, path));
             } else {
-                const existingObs = db[currentDateKey][cad] ? db[currentDateKey][cad].obs : "";
-                db[currentDateKey][cad] = {
+                const existingObs = currentRecord ? currentRecord.obs : "";
+                set(ref(database, path), {
                     status: next,
                     approver: currentApprover,
                     time: new Date().toLocaleTimeString('pt-BR'),
                     obs: existingObs
-                };
+                });
             }
-            saveData();
         }
 
         function saveObs(cad, text) {
-            if (!db[currentDateKey]) db[currentDateKey] = {};
-            if (!db[currentDateKey][cad]) {
-                db[currentDateKey][cad] = {
+            // Se não existe registro, cria como Pendente mas com Obs
+            const currentRecord = (db[currentDateKey] && db[currentDateKey][cad]) ? db[currentDateKey][cad] : null;
+            const path = `pontos/${currentDateKey}/${cad}`;
+
+            if (!currentRecord) {
+                 set(ref(database, path), {
                     status: "Pendente",
                     approver: "-",
                     time: "-",
                     obs: text
-                };
+                });
             } else {
-                db[currentDateKey][cad].obs = text;
+                update(ref(database, path), { obs: text });
             }
-            localStorage.setItem('pontoDiarioDB', JSON.stringify(db));
         }
 
         function approveBranch(branchName) {
             if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
             if (!confirm(`Aprovar TODOS da filial ${branchName} para o dia ${currentDateKey}?`)) return;
 
-            if (!db[currentDateKey]) db[currentDateKey] = {};
             const timeNow = new Date().toLocaleTimeString('pt-BR');
+            const updates = {};
 
             driverList.forEach(d => {
                 if (d.b === branchName) {
-                    const existingObs = db[currentDateKey][d.c] ? db[currentDateKey][d.c].obs : "";
-                    db[currentDateKey][d.c] = {
+                    const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
+                    updates[`pontos/${currentDateKey}/${d.c}`] = {
                         status: "OK",
                         approver: currentApprover,
                         time: timeNow,
-                        obs: existingObs
+                        obs: currentObs
                     };
                 }
             });
-            saveData();
+
+            update(ref(database), updates);
         }
 
         function approveAllDaily() {
             if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
             if (!confirm(`TEM CERTEZA? Isso aprovará TODOS os ${driverList.length} motoristas para o dia ${currentDateKey}.`)) return;
 
-            if (!db[currentDateKey]) db[currentDateKey] = {};
             const timeNow = new Date().toLocaleTimeString('pt-BR');
+            const updates = {};
 
             driverList.forEach(d => {
-                const existingObs = db[currentDateKey][d.c] ? db[currentDateKey][d.c].obs : "";
-                db[currentDateKey][d.c] = {
+                const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
+                updates[`pontos/${currentDateKey}/${d.c}`] = {
                     status: "OK",
                     approver: currentApprover,
                     time: timeNow,
-                    obs: existingObs
+                    obs: currentObs
                 };
             });
-            saveData();
+            update(ref(database), updates);
         }
 
         function clearDay() {
             if (!confirm(`Limpar todas as aprovações do dia ${currentDateKey}?`)) return;
-            delete db[currentDateKey];
-            saveData();
+            remove(ref(database, `pontos/${currentDateKey}`));
         }
 
         // --- LÓGICA DE PERÍODO ---
@@ -505,28 +570,29 @@
             if (!confirm(`Aprovar TUDO para o período de ${startStr} até ${endStr}?`)) return;
 
             const timeNow = new Date().toLocaleTimeString('pt-BR');
+            const updates = {};
+
             let loopDate = new Date(limits.start);
             while (loopDate <= limits.end) {
                 const dateKey = loopDate.toISOString().split('T')[0];
-                if (!db[dateKey]) db[dateKey] = {};
-
+                
                 driverList.forEach(d => {
-                    const existingObs = db[dateKey][d.c] ? db[dateKey][d.c].obs : "";
-                    db[dateKey][d.c] = {
+                    const currentObs = (db[dateKey] && db[dateKey][d.c]) ? db[dateKey][d.c].obs : "";
+                    updates[`pontos/${dateKey}/${d.c}`] = {
                         status: "OK",
                         approver: currentApprover,
                         time: timeNow,
-                        obs: existingObs
+                        obs: currentObs
                     };
                 });
                 loopDate.setDate(loopDate.getDate() + 1);
             }
-            localStorage.setItem('pontoDiarioDB', JSON.stringify(db));
-            alert("Período aprovado com sucesso!");
-            renderTable();
+
+            update(ref(database), updates);
+            alert("Período enviado para processamento no servidor!");
         }
 
-        // --- GESTÃO DE EQUIPE ---
+        // --- GESTÃO DE EQUIPE (SALVA NO FIREBASE) ---
         function openManageModal() {
             document.getElementById('manageModal').style.display = 'flex';
             renderBranchOptions();
@@ -551,18 +617,23 @@
             const branch = document.getElementById('newBranch').value;
             const name = document.getElementById('newName').value.trim();
             if (!cad || !branch || !name) { alert("Preencha todos os campos!"); return; }
+            
             const exists = driverList.find(d => d.c === cad);
             if (exists) { alert("Erro: Cadastro (CAD) já existe!"); return; }
-            driverList.push({ b: branch, c: cad, n: name });
+            
+            // Adiciona localmente e salva no Firebase
+            const newList = [...driverList, { b: branch, c: cad, n: name }];
+            set(driversRef, newList);
+            
             document.getElementById('newCad').value = "";
             document.getElementById('newName').value = "";
-            saveDriverList(); renderManageList(); alert("Funcionário adicionado!");
+            alert("Funcionário adicionado!");
         }
 
         function removeDriver(cad) {
             if (!confirm("Remover funcionário?")) return;
-            driverList = driverList.filter(d => d.c !== cad);
-            saveDriverList(); renderManageList();
+            const newList = driverList.filter(d => d.c !== cad);
+            set(driversRef, newList);
         }
 
         function renderManageList() {
@@ -576,7 +647,7 @@
             });
         }
 
-        // --- EXPORTAÇÃO EXCEL (DIA) ---
+        // --- EXPORTAÇÃO EXCEL (LÓGICA MANTIDA, USA DB GLOBAL) ---
         function exportDay() {
             sortDriverList();
             let csv = "\ufeffFilial;CAD;Nome;Data Referencia;Status;Observacao;Aprovador;Hora Acao\n";
@@ -592,41 +663,28 @@
             downloadCSV(csv, `Ponto_Dia_${currentDateKey}.csv`);
         }
 
-        // --- EXPORTAÇÃO EXCEL (MATRIZ / HORIZONTAL) ---
         function exportPeriodSheet() {
-            sortDriverList(); // Garante ordem Apucarana -> Z
-
+            sortDriverList();
             const limits = getPeriodLimits(currentDateKey);
-            
-            // 1. Gerar Cabeçalho com Datas (Dia 11 até Dia 10)
             let header = "Filial;CAD;Nome";
             const dateArray = [];
             let curr = new Date(limits.start);
-            
             while (curr <= limits.end) {
-                // Guarda data para uso posterior
                 dateArray.push(new Date(curr));
-                // Formata cabeçalho (ex: 11/01)
                 const dayStr = curr.getDate().toString().padStart(2, '0');
                 const monthStr = (curr.getMonth() + 1).toString().padStart(2, '0');
                 header += `;${dayStr}/${monthStr}`;
-                
                 curr.setDate(curr.getDate() + 1);
             }
             header += "\n";
 
-            // 2. Preencher Linhas (Uma por funcionário)
             let body = "";
             driverList.forEach(driver => {
                 let row = `${driver.b};${driver.c};${driver.n}`;
-
-                // Loop pelas colunas de data
                 dateArray.forEach(d => {
                     const dateKey = d.toISOString().split('T')[0];
                     const dayData = db[dateKey] || {};
                     const record = dayData[driver.c];
-                    
-                    // Status simples
                     const status = record ? (record.status === 'OK' ? 'Aprovado' : (record.status === 'Erro' ? 'Reprovado' : 'Pendente')) : 'Pendente';
                     row += `;${status}`;
                 });
@@ -644,7 +702,6 @@
             link.download = fileName;
             link.click();
         }
-
     </script>
 </body>
 </html>
