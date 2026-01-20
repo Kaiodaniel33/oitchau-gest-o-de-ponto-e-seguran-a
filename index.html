@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle Diário - Oitchau (Presidente Edition)</title>
+    <title>Controle Oitchau - Sistema Presidencial</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -43,7 +43,7 @@
         .btn-manage { background: var(--manage-btn); }
         .btn-excel-day { background: var(--excel-day); }
         .btn-excel-period { background: var(--excel-period); border: 1px solid #0d421a; }
-        .btn-individual { background: #6610f2; border: 1px solid #520dc2; } /* Novo Botão Roxo Escuro */
+        .btn-individual { background: #6610f2; border: 1px solid #520dc2; }
 
         /* SUMMARY */
         .summary-bar { display: flex; gap: 15px; margin-bottom: 20px; }
@@ -82,6 +82,8 @@
         .individual-actions button { flex: 1; padding: 15px; font-size: 14px; justify-content: center; }
         .date-range-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .date-range-row div { flex: 1; }
+        
+        #indivSearchResult { transition: 0.3s; font-size: 13px; text-align: center; }
 
         .add-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
         .add-form input, .add-form select { width: 100%; box-sizing: border-box; }
@@ -180,17 +182,22 @@
     <div class="modal-overlay" id="individualModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 style="color: #6610f2;"><i class="fas fa-user-clock"></i> Ação Individual por Período</h2>
+                <h2 style="color: #6610f2;"><i class="fas fa-user-clock"></i> Ação Individual</h2>
                 <span class="close-btn" onclick="closeIndividualModal()">✕</span>
             </div>
             
             <div style="display:flex; flex-direction:column; gap:10px;">
-                <label>1. Selecione o Colaborador:</label>
-                <select id="indivDriverSelect" style="width:100%; font-weight:bold;">
-                    <option value="">Carregando...</option>
-                </select>
+                <label>1. Buscar Colaborador (CAD ou Nome):</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="indivSearchInput" placeholder="Ex: 21001 ou Anderson" onkeydown="if(event.key==='Enter') searchDriver()">
+                    <button class="btn btn-manage" onclick="searchDriver()"><i class="fas fa-search"></i></button>
+                </div>
+                
+                <div id="indivSearchResult" style="padding: 10px; background: #eee; border-radius: 4px; display:none; border: 1px solid #ccc;">
+                    ...
+                </div>
 
-                <div class="date-range-row">
+                <div class="date-range-row" style="margin-top:10px;">
                     <div>
                         <label>2. Data Inicial:</label>
                         <input type="date" id="indivStartDate" style="width:100%">
@@ -201,7 +208,7 @@
                     </div>
                 </div>
 
-                <label>4. Escolha a Ação para este intervalo:</label>
+                <label>4. Executar Ação no Período:</label>
                 <div class="individual-actions">
                     <button class="btn btn-save" onclick="applyIndividualAction('OK')">
                         <i class="fas fa-check"></i> APROVAR
@@ -267,6 +274,7 @@
         let db = {}; 
         let currentApprover = "";
         let currentDateKey = "";
+        let selectedIndivCad = ""; // Armazena quem foi encontrado na busca
 
         // --- INICIALIZAÇÃO ---
         window.onload = function() {
@@ -547,40 +555,60 @@
             });
         }
 
-        // --- NOVA FUNÇÃO: AÇÃO INDIVIDUAL POR PERÍODO ---
+        // --- BUSCA E AÇÃO INDIVIDUAL (ATUALIZADO E EXCELENTE) ---
         function openIndividualModal() {
             document.getElementById('individualModal').style.display = 'flex';
-            const select = document.getElementById('indivDriverSelect');
-            select.innerHTML = '<option value="">Selecione o Colaborador...</option>';
-            
-            // Ordenar lista para facilitar busca
-            const sortedList = [...driverList].sort((a,b) => a.n.localeCompare(b.n));
-            
-            sortedList.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d.c;
-                opt.innerText = `${d.n} (${d.b})`;
-                select.appendChild(opt);
-            });
+            document.getElementById('indivSearchInput').value = "";
+            document.getElementById('indivSearchResult').style.display = 'none';
+            selectedIndivCad = "";
         }
         function closeIndividualModal() { document.getElementById('individualModal').style.display = 'none'; }
+
+        function searchDriver() {
+            const term = document.getElementById('indivSearchInput').value.trim().toLowerCase();
+            const resDiv = document.getElementById('indivSearchResult');
+            
+            if (!term) {
+                resDiv.style.display = 'none';
+                return;
+            }
+
+            // Procura exato no CAD ou parcial no nome
+            const found = driverList.find(d => d.c === term || d.n.toLowerCase().includes(term));
+
+            resDiv.style.display = 'block';
+            if (found) {
+                selectedIndivCad = found.c;
+                resDiv.style.background = '#eef6ff';
+                resDiv.style.color = '#0056b3';
+                resDiv.style.borderColor = '#0056b3';
+                resDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>Encontrado:</b><br>${found.n}<br>Filial: ${found.b} (CAD: ${found.c})`;
+            } else {
+                selectedIndivCad = "";
+                resDiv.style.background = '#f8d7da';
+                resDiv.style.color = '#721c24';
+                resDiv.style.borderColor = '#f5c6cb';
+                resDiv.innerHTML = `<i class="fas fa-times-circle"></i> Colaborador não encontrado.<br>Tente digitar o CAD exato.`;
+            }
+        }
 
         function applyIndividualAction(statusType) {
             const approver = document.getElementById('approverName').value;
             if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
 
-            const cad = document.getElementById('indivDriverSelect').value;
+            if (!selectedIndivCad) { alert("Por favor, BUSQUE e selecione um colaborador válido primeiro."); return; }
+
             const startVal = document.getElementById('indivStartDate').value;
             const endVal = document.getElementById('indivEndDate').value;
 
-            if(!cad || !startVal || !endVal) { alert("Preencha todos os campos!"); return; }
+            if(!startVal || !endVal) { alert("Preencha as datas!"); return; }
 
             const start = new Date(startVal + "T12:00:00");
             const end = new Date(endVal + "T12:00:00");
 
             if(start > end) { alert("Data Inicial não pode ser maior que a Final!"); return; }
 
-            if(!confirm(`Confirmar ação: ${statusType === 'OK' ? 'APROVAR' : (statusType === 'Erro' ? 'REPROVAR' : 'LIMPAR')}\nPara o período selecionado?`)) return;
+            if(!confirm(`Ação: ${statusType === 'OK' ? 'APROVAR' : (statusType === 'Erro' ? 'REPROVAR' : 'LIMPAR')}\nConfirmar?`)) return;
 
             const timeNow = new Date().toLocaleTimeString('pt-BR');
             const updates = {};
@@ -588,14 +616,12 @@
 
             while(loopDate <= end) {
                 const dateKey = loopDate.toISOString().split('T')[0];
-                const path = `pontos/${dateKey}/${cad}`;
+                const path = `pontos/${dateKey}/${selectedIndivCad}`;
                 
                 if(statusType === 'Pendente') {
-                    // Limpar = Remover do banco
                     updates[path] = null;
                 } else {
-                    // Manter observação se existir
-                    const currentObs = (db[dateKey] && db[dateKey][cad]) ? db[dateKey][cad].obs : "";
+                    const currentObs = (db[dateKey] && db[dateKey][selectedIndivCad]) ? db[dateKey][selectedIndivCad].obs : "";
                     updates[path] = {
                         status: statusType,
                         approver: approver,
@@ -608,11 +634,11 @@
 
             database.ref().update(updates)
                 .then(() => {
-                    alert("Ação realizada com sucesso!");
+                    alert("Sucesso!");
                     closeIndividualModal();
                 })
                 .catch((err) => {
-                    alert("Erro ao salvar: " + err.message);
+                    alert("Erro: " + err.message);
                 });
         }
 
