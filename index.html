@@ -10,6 +10,8 @@
             --brand: #0056b3; --bg: #f4f7f6; --white: #ffffff;
             --border: #ddd; --text: #333; --period-btn: #6f42c1;
             --manage-btn: #fd7e14; --excel-day: #218838; --excel-period: #115722;
+            --btn-reprove: #c82333; /* Vermelho mais forte */
+            --btn-undo: #6c757d; /* Cinza para cancelar/voltar */
         }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
 
@@ -34,11 +36,14 @@
         input#approverName { width: 200px; border-left: 3px solid var(--brand); }
 
         /* BUTTONS */
-        .btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+        .btn-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: flex-end; }
         .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; display: flex; align-items: center; gap: 5px; font-size: 12px; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        
         .btn-save { background: var(--brand); }
         .btn-trash { background: #dc3545; }
+        .btn-reprove { background: var(--btn-reprove); }
+        .btn-undo { background: var(--btn-undo); }
         .btn-period-action { background: var(--period-btn); }
         .btn-manage { background: var(--manage-btn); }
         .btn-excel-day { background: var(--excel-day); }
@@ -92,6 +97,11 @@
         .manage-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; font-size: 12px; align-items: center; }
         .manage-item:hover { background: #f9f9f9; }
         .btn-del { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 10px; }
+        
+        /* Layout Grid para Ações */
+        .actions-grid { display: grid; gap: 10px; grid-template-columns: auto auto; }
+        .action-column { display: flex; flex-direction: column; gap: 5px; }
+        .action-label { font-size: 10px; color: #888; margin-bottom: 2px; text-transform: uppercase; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -113,18 +123,38 @@
             <input type="text" id="approverName" placeholder="Seu nome (Ex: Kaio)" onchange="saveConfig()">
         </div>
 
-        <div class="control-group">
-            <label>Ações em Massa</label>
+        <div class="control-group" style="flex: 1;">
+            <label>Central de Ações</label>
             <div class="btn-row">
-                <button class="btn btn-save" onclick="approveAllDaily()" title="Aprovar tela atual">
-                    <i class="fas fa-check-double"></i> Dia Todos
-                </button>
-                <button class="btn btn-period-action" onclick="approvePeriod()" title="Aprovar Todos (11 a 10)">
-                    <i class="fas fa-calendar-alt"></i> Período Todos
-                </button>
-                <button class="btn btn-individual" onclick="openIndividualModal()" title="Aprovar só um cara por período">
-                    <i class="fas fa-user-clock"></i> Período Individual
-                </button>
+                <div style="display:flex; flex-direction:column; gap:5px; border-right: 1px solid #ddd; padding-right: 10px; margin-right: 5px;">
+                    <span class="action-label">Ações do Dia (Tela)</span>
+                    <div style="display: flex; gap: 5px;">
+                        <button class="btn btn-save" onclick="approveAllDaily()" title="Aprovar TODOS deste dia">
+                            <i class="fas fa-check-double"></i> Aprovar Dia
+                        </button>
+                        <button class="btn btn-reprove" onclick="reproveAllDaily()" title="Reprovar TODOS deste dia">
+                            <i class="fas fa-times-circle"></i> Reprovar
+                        </button>
+                        <button class="btn btn-undo" onclick="cancelAllDaily()" title="Limpar/Cancelar Dia">
+                            <i class="fas fa-eraser"></i> Limpar
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <span class="action-label">Ações do Período (11 a 10)</span>
+                    <div style="display: flex; gap: 5px;">
+                        <button class="btn btn-period-action" onclick="approvePeriod()" title="Aprovar Período de TODOS">
+                            <i class="fas fa-calendar-check"></i> Aprovar Período
+                        </button>
+                        <button class="btn btn-undo" onclick="cancelPeriod()" title="Desfazer/Cancelar Período de TODOS">
+                            <i class="fas fa-undo"></i> Cancelar Período
+                        </button>
+                        <button class="btn btn-individual" onclick="openIndividualModal()" title="Ação para um só motorista">
+                            <i class="fas fa-user-clock"></i> Individual
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -216,8 +246,8 @@
                     <button class="btn btn-trash" onclick="applyIndividualAction('Erro')">
                         <i class="fas fa-times"></i> REPROVAR
                     </button>
-                    <button class="btn" style="background:#888;" onclick="applyIndividualAction('Pendente')">
-                        <i class="fas fa-eraser"></i> LIMPAR
+                    <button class="btn btn-undo" onclick="applyIndividualAction('Pendente')">
+                        <i class="fas fa-undo"></i> CANCELAR / VOLTAR
                     </button>
                 </div>
             </div>
@@ -461,6 +491,7 @@
             database.ref().update(updates);
         }
 
+        // --- AÇÕES EM MASSA (DIA) ---
         function approveAllDaily() {
             if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
             if (!confirm(`Aprovar TODOS para o dia ${currentDateKey}?`)) return;
@@ -473,11 +504,24 @@
             database.ref().update(updates);
         }
 
-        function clearDay() {
-            if (!confirm(`Limpar dia ${currentDateKey}?`)) return;
+        function reproveAllDaily() {
+            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
+            if (!confirm(`REPROVAR TODOS para o dia ${currentDateKey}?`)) return;
+            const timeNow = new Date().toLocaleTimeString('pt-BR');
+            const updates = {};
+            driverList.forEach(d => {
+                const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
+                updates[`pontos/${currentDateKey}/${d.c}`] = { status: "Erro", approver: currentApprover, time: timeNow, obs: currentObs };
+            });
+            database.ref().update(updates);
+        }
+
+        function cancelAllDaily() {
+            if (!confirm(`ATENÇÃO: Isso vai LIMPAR (Desfazer) as aprovações de hoje (${currentDateKey}).\nTodos voltarão para PENDENTE.\n\nConfirmar?`)) return;
             database.ref(`pontos/${currentDateKey}`).remove();
         }
 
+        // --- AÇÕES EM MASSA (PERÍODO) ---
         function getPeriodLimits(dateStr) {
             const current = new Date(dateStr + "T12:00:00");
             const day = current.getDate();
@@ -506,6 +550,26 @@
             }
             database.ref().update(updates);
             alert("Aprovando período em massa...");
+        }
+
+        function cancelPeriod() {
+            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
+            const limits = getPeriodLimits(currentDateKey);
+            
+            if (!confirm(`PERIGO: Você vai CANCELAR (Desfazer) as aprovações de TODOS no período:\nDe: ${limits.start.toLocaleDateString('pt-BR')}\nAté: ${limits.end.toLocaleDateString('pt-BR')}\n\nTodos voltarão para PENDENTE. Tem certeza?`)) return;
+            
+            const updates = {};
+            let loopDate = new Date(limits.start);
+            while (loopDate <= limits.end) {
+                const dateKey = loopDate.toISOString().split('T')[0];
+                // Definir como null remove o nó no Firebase
+                driverList.forEach(d => {
+                    updates[`pontos/${dateKey}/${d.c}`] = null;
+                });
+                loopDate.setDate(loopDate.getDate() + 1);
+            }
+            database.ref().update(updates);
+            alert("Cancelando período em massa... Todos voltando para Pendente.");
         }
 
         // --- GESTÃO DE EQUIPE ---
@@ -555,7 +619,7 @@
             });
         }
 
-        // --- BUSCA E AÇÃO INDIVIDUAL (ATUALIZADO E EXCELENTE) ---
+        // --- BUSCA E AÇÃO INDIVIDUAL ---
         function openIndividualModal() {
             document.getElementById('individualModal').style.display = 'flex';
             document.getElementById('indivSearchInput').value = "";
@@ -608,7 +672,12 @@
 
             if(start > end) { alert("Data Inicial não pode ser maior que a Final!"); return; }
 
-            if(!confirm(`Ação: ${statusType === 'OK' ? 'APROVAR' : (statusType === 'Erro' ? 'REPROVAR' : 'LIMPAR')}\nConfirmar?`)) return;
+            let actionName = "";
+            if(statusType === 'OK') actionName = "APROVAR";
+            else if(statusType === 'Erro') actionName = "REPROVAR";
+            else actionName = "CANCELAR / VOLTAR (Pendente)";
+
+            if(!confirm(`Ação: ${actionName}\nConfirmar?`)) return;
 
             const timeNow = new Date().toLocaleTimeString('pt-BR');
             const updates = {};
@@ -619,6 +688,7 @@
                 const path = `pontos/${dateKey}/${selectedIndivCad}`;
                 
                 if(statusType === 'Pendente') {
+                    // Remove do banco (volta a ficar em branco/pendente)
                     updates[path] = null;
                 } else {
                     const currentObs = (db[dateKey] && db[dateKey][selectedIndivCad]) ? db[dateKey][selectedIndivCad].obs : "";
