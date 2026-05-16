@@ -3,193 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle Oitchau - Sistema Presidencial</title>
+    <title>Controle Oitchau - Expresso Nordeste</title>
+    
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --brand: #0056b3; --bg: #f4f7f6; --white: #ffffff;
-            --border: #ddd; --text: #333; --period-btn: #6f42c1;
-            --manage-btn: #fd7e14; --excel-day: #218838; --excel-period: #115722;
-            --btn-reprove: #c82333; /* Vermelho mais forte */
-            --btn-undo: #6c757d; /* Cinza para cancelar/voltar */
-        }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
-
-        /* HEADER */
-        .top-panel {
-            background: var(--white); padding: 20px; border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-top: 5px solid var(--brand);
-            display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; margin-bottom: 20px;
-        }
-        .title-box h1 { margin: 0; color: var(--brand); font-size: 22px; font-weight: 800; }
-        .title-box p { margin: 5px 0 0; color: #777; font-size: 12px; }
-        
-        .status-connection { font-size: 11px; margin-top:5px; font-weight: bold; }
-        .status-online { color: #218838; }
-        .status-offline { color: #dc3545; }
-
-        .control-group { display: flex; flex-direction: column; }
-        label { font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px; text-transform: uppercase; }
-
-        input[type="date"], input[type="text"], select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; outline: none; }
-        input[type="date"] { border-color: var(--brand); background: #eef6ff; font-weight: bold; color: var(--brand); }
-        input#approverName { width: 200px; border-left: 3px solid var(--brand); }
-
-        /* BUTTONS */
-        .btn-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: flex-end; }
-        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; display: flex; align-items: center; gap: 5px; font-size: 12px; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        
-        .btn-save { background: var(--brand); }
-        .btn-trash { background: #dc3545; }
-        .btn-reprove { background: var(--btn-reprove); }
-        .btn-undo { background: var(--btn-undo); }
-        .btn-period-action { background: var(--period-btn); }
-        .btn-manage { background: var(--manage-btn); }
-        .btn-excel-day { background: var(--excel-day); }
-        .btn-excel-period { background: var(--excel-period); border: 1px solid #0d421a; }
-        .btn-individual { background: #6610f2; border: 1px solid #520dc2; }
-
-        /* SUMMARY */
-        .summary-bar { display: flex; gap: 15px; margin-bottom: 20px; }
-        .card { background: white; padding: 10px 20px; border-radius: 6px; flex: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
-        .card h3 { margin: 0; font-size: 24px; color: var(--brand); }
-        .card span { font-size: 12px; color: #666; }
-
-        /* TABLE */
-        .branch-block { background: white; margin-bottom: 20px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; }
-        .branch-head { background: #f8f9fa; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; }
-        .branch-name { font-weight: bold; color: #444; }
-        .btn-branch-approve { background: var(--brand); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 10px 15px; font-size: 12px; color: #888; border-bottom: 2px solid #eee; }
-        td { padding: 8px 15px; border-bottom: 1px solid #f0f0f0; font-size: 13px; vertical-align: middle; }
-        tr:hover { background: #faffff; }
-
-        .obs-input { width: 100%; border: none; border-bottom: 1px solid #ccc; background: transparent; padding: 4px; font-size: 12px; }
-        .obs-input:focus { border-bottom: 1px solid var(--brand); outline: none; background: #fff; }
-
-        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; cursor: pointer; display: inline-block; width: 85px; text-align: center; border: 1px solid transparent; }
-        .st-pendente { background: #ffeeba; color: #856404; border-color: #ffeeba; }
-        .st-ok { background: #d4edda; color: #155724; border-color: #c3e6cb; }
-        .st-erro { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
-
-        /* MODAL */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 500px; max-width: 90%; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .modal-header h2 { margin: 0; font-size: 18px; color: var(--manage-btn); }
-        .close-btn { cursor: pointer; font-weight: bold; color: #999; }
-        
-        /* Modal Individual */
-        .individual-actions { display: flex; gap: 10px; margin-top: 15px; }
-        .individual-actions button { flex: 1; padding: 15px; font-size: 14px; justify-content: center; }
-        .date-range-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .date-range-row div { flex: 1; }
-        
-        #indivSearchResult { transition: 0.3s; font-size: 13px; text-align: center; }
-
-        .add-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-        .add-form input, .add-form select { width: 100%; box-sizing: border-box; }
-        .full-width { grid-column: span 2; }
-        .manage-list { max-height: 300px; overflow-y: auto; border: 1px solid #eee; }
-        .manage-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; font-size: 12px; align-items: center; }
-        .manage-item:hover { background: #f9f9f9; }
-        .btn-del { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 10px; }
-        
-        /* Layout Grid para Ações */
-        .actions-grid { display: grid; gap: 10px; grid-template-columns: auto auto; }
-        .action-column { display: flex; flex-direction: column; gap: 5px; }
-        .action-label { font-size: 10px; color: #888; margin-bottom: 2px; text-transform: uppercase; font-weight: bold; }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="top-panel">
-        <div class="title-box">
-            <h1><i class="fas fa-check-circle"></i> Controle Oitchau</h1>
-            <p>Conectado ao Servidor: oitchauserv</p>
-            <div id="connectionStatus" class="status-connection status-offline"><i class="fas fa-circle"></i> Conectando...</div>
+    <div id="loginScreen" class="login-wrapper">
+        <div class="login-card">
+            <div class="login-logo">
+                <i class="fas fa-bus-alt"></i>
+                <h2>Expresso Nordeste</h2>
+                <p>Controle de Ponto - Oitchau</p>
+            </div>
+            <form id="loginForm" onsubmit="realizarLogin(event)">
+                <div class="input-group">
+                    <label for="username"><i class="fas fa-user"></i> Usuário</label>
+                    <input type="text" id="username" placeholder="Digite seu usuário" required>
+                </div>
+                <div class="input-group">
+                    <label for="password"><i class="fas fa-lock"></i> Senha</label>
+                    <input type="password" id="password" placeholder="Digite sua senha" required>
+                </div>
+                <p id="loginError" class="login-error">Usuário ou senha incorretos!</p>
+                <button type="submit" class="btn btn-login">Acessar Sistema</button>
+            </form>
         </div>
+    </div>
 
-        <div class="control-group">
-            <label>Data de Referência</label>
-            <input type="date" id="datePicker" onchange="loadDate()">
-        </div>
+    <div id="mainApp" style="display: none;">
+        <div class="top-panel">
+            <div class="title-box">
+                <h1><i class="fas fa-bus"></i> Expresso Nordeste</h1>
+                <p>Gestão de Ponto - Oitchau (Servidor: oitchauserv)</p>
+                <div id="connectionStatus" class="status-connection status-offline"><i class="fas fa-circle"></i> Conectando...</div>
+            </div>
 
-        <div class="control-group">
-            <label>Aprovador</label>
-            <input type="text" id="approverName" placeholder="Seu nome (Ex: Kaio)" onchange="saveConfig()">
-        </div>
+            <div class="control-group">
+                <label>Data de Referência</label>
+                <input type="date" id="datePicker" onchange="loadDate()">
+            </div>
 
-        <div class="control-group" style="flex: 1;">
-            <label>Central de Ações</label>
-            <div class="btn-row">
-                <div style="display:flex; flex-direction:column; gap:5px; border-right: 1px solid #ddd; padding-right: 10px; margin-right: 5px;">
-                    <span class="action-label">Ações do Dia (Tela)</span>
-                    <div style="display: flex; gap: 5px;">
-                        <button class="btn btn-save" onclick="approveAllDaily()" title="Aprovar TODOS deste dia">
-                            <i class="fas fa-check-double"></i> Aprovar Dia
-                        </button>
-                        <button class="btn btn-reprove" onclick="reproveAllDaily()" title="Reprovar TODOS deste dia">
-                            <i class="fas fa-times-circle"></i> Reprovar
-                        </button>
-                        <button class="btn btn-undo" onclick="cancelAllDaily()" title="Limpar/Cancelar Dia">
-                            <i class="fas fa-eraser"></i> Limpar
-                        </button>
+            <div class="control-group">
+                <label>Aprovador Atual</label>
+                <input type="text" id="approverName" placeholder="Seu nome (Ex: Kaio)" onchange="saveConfig()">
+            </div>
+
+            <div class="control-group" style="flex: 1;">
+                <label>Central de Ações Rápida</label>
+                <div class="btn-row">
+                    <div class="action-block">
+                        <span class="action-label">Ações do Dia (Tela)</span>
+                        <div class="action-buttons">
+                            <button class="btn btn-save" onclick="approveAllDaily()" title="Aprovar TODOS deste dia">
+                                <i class="fas fa-check-double"></i> Aprovar Dia
+                            </button>
+                            <button class="btn btn-reprove" onclick="reproveAllDaily()" title="Reprovar TODOS deste dia">
+                                <i class="fas fa-times-circle"></i> Reprovar
+                            </button>
+                            <button class="btn btn-undo" onclick="cancelAllDaily()" title="Limpar/Cancelar Dia">
+                                <i class="fas fa-eraser"></i> Limpar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="action-block no-border">
+                        <span class="action-label">Ações do Período (11 a 10)</span>
+                        <div class="action-buttons">
+                            <button class="btn btn-period-action" onclick="approvePeriod()" title="Aprovar Período de TODOS">
+                                <i class="fas fa-calendar-check"></i> Aprovar Período
+                            </button>
+                            <button class="btn btn-undo" onclick="cancelPeriod()" title="Desfazer/Cancelar Período de TODOS">
+                                <i class="fas fa-undo"></i> Cancelar
+                            </button>
+                            <button class="btn btn-individual" onclick="openIndividualModal()" title="Ação para um só motorista">
+                                <i class="fas fa-user-clock"></i> Individual
+                            </button>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div style="display:flex; flex-direction:column; gap:5px;">
-                    <span class="action-label">Ações do Período (11 a 10)</span>
-                    <div style="display: flex; gap: 5px;">
-                        <button class="btn btn-period-action" onclick="approvePeriod()" title="Aprovar Período de TODOS">
-                            <i class="fas fa-calendar-check"></i> Aprovar Período
-                        </button>
-                        <button class="btn btn-undo" onclick="cancelPeriod()" title="Desfazer/Cancelar Período de TODOS">
-                            <i class="fas fa-undo"></i> Cancelar Período
-                        </button>
-                        <button class="btn btn-individual" onclick="openIndividualModal()" title="Ação para um só motorista">
-                            <i class="fas fa-user-clock"></i> Individual
-                        </button>
-                    </div>
+            <div class="control-group">
+                <label>Gestão & Relatórios</label>
+                <div class="btn-row">
+                    <button class="btn btn-manage" onclick="openManageModal()">
+                        <i class="fas fa-users-cog"></i> Equipe
+                    </button>
+                    <button class="btn btn-excel-day" onclick="exportDay()">
+                        <i class="fas fa-file-excel"></i> Dia
+                    </button>
+                    <button class="btn btn-excel-period" onclick="exportPeriodSheet()">
+                        <i class="fas fa-table"></i> Matriz
+                    </button>
+                    <button class="btn btn-reprove" onclick="sairSistema()" style="margin-left: 10px;">
+                        <i class="fas fa-sign-out-alt"></i> Sair
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div class="control-group">
-            <label>Gestão & Excel</label>
-            <div class="btn-row">
-                <button class="btn btn-manage" onclick="openManageModal()">
-                    <i class="fas fa-users-cog"></i> Equipe
-                </button>
-                <button class="btn btn-excel-day" onclick="exportDay()">
-                    <i class="fas fa-file-excel"></i> Dia
-                </button>
-                <button class="btn btn-excel-period" onclick="exportPeriodSheet()">
-                    <i class="fas fa-table"></i> Matriz
-                </button>
+        <div class="summary-bar">
+            <div class="card card-ok">
+                <div class="card-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="card-info">
+                    <h3 id="count-ok">0</h3>
+                    <span>Aprovados Hoje</span>
+                </div>
+            </div>
+            <div class="card card-pending">
+                <div class="card-icon"><i class="fas fa-clock"></i></div>
+                <div class="card-info">
+                    <h3 id="count-pending">0</h3>
+                    <span>Pendentes Hoje</span>
+                </div>
+            </div>
+            <div class="card card-total">
+                <div class="card-icon"><i class="fas fa-users"></i></div>
+                <div class="card-info">
+                    <h3 id="count-total">0</h3>
+                    <span>Total da Equipe</span>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="summary-bar">
-        <div class="card">
-            <h3 id="count-ok">0</h3>
-            <span>Aprovados Hoje</span>
-        </div>
-        <div class="card">
-            <h3 id="count-pending">0</h3>
-            <span>Pendentes Hoje</span>
-        </div>
-        <div class="card">
-            <h3 id="count-total">0</h3>
-            <span>Total Equipe</span>
-        </div>
+        <div id="tableContainer"></div>
     </div>
-
-    <div id="tableContainer"></div>
 
     <div class="modal-overlay" id="manageModal">
         <div class="modal-content">
@@ -198,12 +139,21 @@
                 <span class="close-btn" onclick="closeManageModal()">✕</span>
             </div>
             <div class="add-form">
-                <input type="text" id="newCad" placeholder="Cadastro (CAD)">
-                <select id="newBranch">
-                    <option value="">Selecione a Filial...</option>
-                </select>
-                <input type="text" id="newName" class="full-width" placeholder="Nome Completo">
-                <button class="btn btn-save full-width" onclick="addDriver()">+ Adicionar Pessoa</button>
+                <div class="input-wrap">
+                    <label>Cadastro (CAD)</label>
+                    <input type="text" id="newCad" placeholder="Ex: 12345">
+                </div>
+                <div class="input-wrap">
+                    <label>Filial</label>
+                    <select id="newBranch">
+                        <option value="">Selecione a Filial...</option>
+                    </select>
+                </div>
+                <div class="input-wrap full-width">
+                    <label>Nome Completo</label>
+                    <input type="text" id="newName" placeholder="Digite o nome do colaborador">
+                </div>
+                <button class="btn btn-save full-width" onclick="addDriver()">+ Adicionar Pessoa à Base</button>
             </div>
             <div class="manage-list" id="manageListContainer"></div>
         </div>
@@ -216,39 +166,41 @@
                 <span class="close-btn" onclick="closeIndividualModal()">✕</span>
             </div>
             
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <label>1. Buscar Colaborador (CAD ou Nome):</label>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="indivSearchInput" placeholder="Ex: 21001 ou Anderson" onkeydown="if(event.key==='Enter') searchDriver()">
-                    <button class="btn btn-manage" onclick="searchDriver()"><i class="fas fa-search"></i></button>
+            <div style="display:flex; flex-direction:column; gap:15px;">
+                <div>
+                    <label style="font-size: 12px; font-weight: bold; color: var(--text);">1. Buscar Colaborador (CAD ou Nome):</label>
+                    <div style="display:flex; gap:10px; margin-top: 5px;">
+                        <input type="text" id="indivSearchInput" placeholder="Ex: 21001 ou Anderson" onkeydown="if(event.key==='Enter') searchDriver()" style="flex:1; padding: 10px; border: 1px solid #ccc; border-radius: 6px;">
+                        <button class="btn btn-manage" onclick="searchDriver()"><i class="fas fa-search"></i> Buscar</button>
+                    </div>
                 </div>
                 
-                <div id="indivSearchResult" style="padding: 10px; background: #eee; border-radius: 4px; display:none; border: 1px solid #ccc;">
-                    ...
-                </div>
+                <div id="indivSearchResult" class="search-result-box">...</div>
 
-                <div class="date-range-row" style="margin-top:10px;">
+                <div class="date-range-row">
                     <div>
                         <label>2. Data Inicial:</label>
-                        <input type="date" id="indivStartDate" style="width:100%">
+                        <input type="date" id="indivStartDate" class="date-input">
                     </div>
                     <div>
                         <label>3. Data Final:</label>
-                        <input type="date" id="indivEndDate" style="width:100%">
+                        <input type="date" id="indivEndDate" class="date-input">
                     </div>
                 </div>
 
-                <label>4. Executar Ação no Período:</label>
-                <div class="individual-actions">
-                    <button class="btn btn-save" onclick="applyIndividualAction('OK')">
-                        <i class="fas fa-check"></i> APROVAR
-                    </button>
-                    <button class="btn btn-trash" onclick="applyIndividualAction('Erro')">
-                        <i class="fas fa-times"></i> REPROVAR
-                    </button>
-                    <button class="btn btn-undo" onclick="applyIndividualAction('Pendente')">
-                        <i class="fas fa-undo"></i> CANCELAR / VOLTAR
-                    </button>
+                <div>
+                    <label style="font-size: 12px; font-weight: bold; color: var(--text);">4. Executar Ação no Período:</label>
+                    <div class="individual-actions">
+                        <button class="btn btn-save" onclick="applyIndividualAction('OK')">
+                            <i class="fas fa-check"></i> APROVAR
+                        </button>
+                        <button class="btn btn-reprove" onclick="applyIndividualAction('Erro')">
+                            <i class="fas fa-times"></i> REPROVAR
+                        </button>
+                        <button class="btn btn-undo" onclick="applyIndividualAction('Pendente')">
+                            <i class="fas fa-undo"></i> CANCELAR / VOLTAR
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -256,840 +208,6 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
-    <script>
-        // --- CONFIGURAÇÃO ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAJY7pPpxurwbiIhjjDfsPh0NPyuO_vNi8",
-            authDomain: "oitchauserv.firebaseapp.com",
-            projectId: "oitchauserv",
-            storageBucket: "oitchauserv.firebasestorage.app",
-            messagingSenderId: "670263819451",
-            appId: "1:670263819451:web:08addbf9f8c2b8d78dbd9e"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        const dbRef = database.ref('pontos');
-        const driversRef = database.ref('equipe');
-
-        // --- DADOS PADRÃO (ATUALIZADO CONFORME PDF) ---
-        const defaultDriverList = [
-            // APUCARANA
-            {b:"Apucarana", c:"21001", n:"Anderson Patrício Schatz"}, 
-            {b:"Apucarana", c:"19999", n:"Antonio Gomes de Lima"}, 
-            {b:"Apucarana", c:"21672", n:"João Marcos Balachi"}, 
-            {b:"Apucarana", c:"9213", n:"Olimpio Pereira da Silva"}, 
-            {b:"Apucarana", c:"21474", n:"Ricardo Hikazutani Marques"},
-
-            // ARARAQUARA
-            {b:"Araraquara", c:"2037", n:"Ademilson Jesus da Silva"}, 
-            {b:"Araraquara", c:"1968", n:"Anderson Lucas Vieira Rocha"}, 
-            {b:"Araraquara", c:"1974", n:"Alexsandro Brito Meira Rodrigues"}, 
-            {b:"Araraquara", c:"1843", n:"Anailson Nunes dos Santos"}, 
-            {b:"Araraquara", c:"1880", n:"Antonio Fernando de Alencar"}, 
-            {b:"Araraquara", c:"1760", n:"Amilton Teixeira dos Santos"}, 
-            {b:"Araraquara", c:"1969", n:"Dayvison Bruno Marcelino da Silva"}, 
-            {b:"Araraquara", c:"1995", n:"José Adelso Pereira Alves"}, 
-            {b:"Araraquara", c:"2071", n:"Luiz Fernando Munhoz Torres"}, 
-            {b:"Araraquara", c:"2042", n:"Michel de Araújo dos Santos"}, 
-            {b:"Araraquara", c:"1410", n:"Pedro Luiz da Silva"}, 
-            {b:"Araraquara", c:"2115", n:"Peterson Luis Apº Victor Jacyntho"},
-            {b:"Araraquara", c:"2111", n:"Roberto Gonsalves da Silva"},
-            {b:"Araraquara", c:"2100", n:"Tiago Pereira da Silva Santos"},
-
-            // BRASÍLIA
-            {b:"Brasília", c:"1849", n:"Antonio Sergio Bispo Dantas"}, 
-            {b:"Brasília", c:"1066", n:"Carlos Santana da Silva Neto"}, 
-            {b:"Brasília", c:"1994", n:"Gesiel Ferreira dos Santos"}, 
-            {b:"Brasília", c:"2069", n:"Felipe Batista da Silva"}, 
-            {b:"Brasília", c:"1087", n:"Hélio Saturnino da Silva"}, 
-            {b:"Brasília", c:"1848", n:"Jucelino Cintra dos Santos"}, 
-            {b:"Brasília", c:"2072", n:"Marcio Spinosa Sousa"}, 
-            {b:"Brasília", c:"1884", n:"Marcos Tulio de Oliveira"}, 
-            {b:"Brasília", c:"2073", n:"Paulo Henrique Nunes dos Santos"},
-            {b:"Brasília", c:"1499", n:"Pedro Willa da Silva Nascimento"}, 
-            {b:"Brasília", c:"1819", n:"Robson Alves dos Santos"},
-
-            // CASCAVEL
-            {b:"Cascavel", c:"21308", n:"Alexandre Magno Jacobs"}, 
-            {b:"Cascavel", c:"2119", n:"Alison Brun Domingos"},
-            {b:"Cascavel", c:"14733", n:"Alvandir Alves de Oliveira"}, 
-            {b:"Cascavel", c:"1993", n:"Amilton Golub"}, 
-            {b:"Cascavel", c:"1544", n:"Atair do Bonfim"}, 
-            {b:"Cascavel", c:"1389", n:"Claudemir Galvan"}, 
-            {b:"Cascavel", c:"1402", n:"Claudemar Pasti"}, 
-            {b:"Cascavel", c:"2095", n:"Daniel Eduardo da Cruz"}, 
-            {b:"Cascavel", c:"2083", n:"Deoclides Marcos da Silveira"}, 
-            {b:"Cascavel", c:"19450", n:"Odair Soares de Carvalho"}, 
-            {b:"Cascavel", c:"2031", n:"Ronaldo de Souza"}, 
-            {b:"Cascavel", c:"1759", n:"Santiago Teixeira Bertolino"}, 
-            {b:"Cascavel", c:"1816", n:"Valderi de Jesus Fernando"}, 
-            {b:"Cascavel", c:"2057", n:"Wandei Braz de Camargo"},
-
-            // CAMPINAS
-            {b:"Campinas", c:"2032", n:"Adriano Oliveira de Souza"}, 
-            {b:"Campinas", c:"1301", n:"Alex Rubens Tiba Fiori"}, 
-            {b:"Campinas", c:"2094", n:"Edson Antonio da Silva"}, 
-            {b:"Campinas", c:"1996", n:"Gustavo Gonsalves do Nascimento"}, 
-            {b:"Campinas", c:"1935", n:"Jhone dos Santos Dias"}, 
-            {b:"Campinas", c:"2078", n:"João Gabriel Lima dos Santos"}, 
-            {b:"Campinas", c:"2106", n:"José Antonio da Silva"},
-            {b:"Campinas", c:"1329", n:"José Tavares Filho"}, 
-            {b:"Campinas", c:"1841", n:"Luciano Pereira da Silva"}, 
-            {b:"Campinas", c:"2118", n:"Luiz Lopes"},
-            {b:"Campinas", c:"2079", n:"Marcelo Magalhães"}, 
-            {b:"Campinas", c:"2089", n:"Moisés Alves Teixeira"}, 
-            {b:"Campinas", c:"2044", n:"Otávio Augusto dos Santos Custódio"}, 
-            {b:"Campinas", c:"2017", n:"Valdemir dos Santos"}, 
-            {b:"Campinas", c:"1802", n:"Willian dos Santos de Moura"},
-
-            // CAMPO MOURÃO
-            {b:"Campo Mourão", c:"19413", n:"Ademir Ribeiro Pepineli"}, 
-            {b:"Campo Mourão", c:"85", n:"Adenilson Araújo do Vale"}, 
-            {b:"Campo Mourão", c:"21712", n:"Adriano Luiz Ramos"}, 
-            {b:"Campo Mourão", c:"541", n:"Agilson Moleta"}, 
-            {b:"Campo Mourão", c:"1375", n:"Aldair da Silva"},
-            {b:"Campo Mourão", c:"1944", n:"Altervir Silveira da Silva"}, 
-            {b:"Campo Mourão", c:"1549", n:"Carlos Barbosa de Oliveira"}, 
-            {b:"Campo Mourão", c:"21825", n:"Cilas Rosa Sobrinho"}, 
-            {b:"Campo Mourão", c:"2011", n:"Cleber Gabriel da Rocha"}, 
-            {b:"Campo Mourão", c:"70", n:"Denis Isao Okubo"}, 
-            {b:"Campo Mourão", c:"21740", n:"Denis Domingues"}, 
-            {b:"Campo Mourão", c:"1265", n:"Douglas Soares Dias"}, 
-            {b:"Campo Mourão", c:"21869", n:"Douglas Vieira Santana"}, 
-            {b:"Campo Mourão", c:"322", n:"Edevanildo Francisco Lima"}, 
-            {b:"Campo Mourão", c:"1091", n:"Elton Jonnatan dos Santos"}, 
-            {b:"Campo Mourão", c:"21893", n:"Erivaldo da Cruz"},
-            {b:"Campo Mourão", c:"21843", n:"Ewerton Henrique Nunes"}, 
-            {b:"Campo Mourão", c:"1088", n:"Fernando Ferreira da Silva"}, 
-            {b:"Campo Mourão", c:"2124", n:"Giovani Gil"},
-            {b:"Campo Mourão", c:"2065", n:"Ismael Dias de Souza Ventura"}, 
-            {b:"Campo Mourão", c:"1669", n:"Iury Araújo do Vale"}, 
-            {b:"Campo Mourão", c:"1967", n:"Jadson Enéias Fidelis"}, 
-            {b:"Campo Mourão", c:"1966", n:"João Paulo Souza de Lima"}, 
-            {b:"Campo Mourão", c:"21388", n:"Jhione Cleiton Coelho Capiche"}, 
-            {b:"Campo Mourão", c:"20316", n:"Jonatas do Nascimento"}, 
-            {b:"Campo Mourão", c:"20874", n:"Junior Stevanelli Martins"}, 
-            {b:"Campo Mourão", c:"1446", n:"Marcio da Silva"}, 
-            {b:"Campo Mourão", c:"1109", n:"Marcos Antonio de Campos"}, 
-            {b:"Campo Mourão", c:"21853", n:"Paulo João dos Santos"}, 
-            {b:"Campo Mourão", c:"1315", n:"Reginaldo de Paula"}, 
-            {b:"Campo Mourão", c:"1422", n:"Reginaldo Vitorino de Oliveira"}, 
-            {b:"Campo Mourão", c:"1823", n:"Robson Kummorow Ferreira"}, 
-            {b:"Campo Mourão", c:"1978", n:"Rodrigo Aparecido Mafra de Assis"}, 
-            {b:"Campo Mourão", c:"527", n:"Rodrigo Antonio Viana"}, 
-            {b:"Campo Mourão", c:"2087", n:"Romário da Silva"}, 
-            {b:"Campo Mourão", c:"2053", n:"Romário Santos Sá"}, 
-            {b:"Campo Mourão", c:"1758", n:"Sergio Gomes Ferreira"}, 
-            {b:"Campo Mourão", c:"1308", n:"Sergio Miguel da Silva"}, 
-            {b:"Campo Mourão", c:"1219", n:"Wesley Diogo Gomes Vieria"},
-
-            // CURITIBA
-            {b:"Curitiba", c:"1470", n:"Agripino Moreira de Almeida"}, 
-            {b:"Curitiba", c:"2123", n:"Alex Sandro Vasconcelos"},
-            {b:"Curitiba", c:"1501", n:"Anderson Antonio de Oliveira"}, 
-            {b:"Curitiba", c:"1972", n:"Cleucir Alves Gonzales"}, 
-            {b:"Curitiba", c:"1861", n:"Djalma Lúcio de Souza Castro"}, 
-            {b:"Curitiba", c:"1862", n:"Edenilson Vaz de França"}, 
-            {b:"Curitiba", c:"1860", n:"Edinan Henrique Ferreira"}, 
-            {b:"Curitiba", c:"1235", n:"Gilvan Alves da Silva"}, 
-            {b:"Curitiba", c:"1795", n:"Flávio Reis da Silva"}, 
-            {b:"Curitiba", c:"2108", n:"Jameson dos Santos Pereira"},
-            {b:"Curitiba", c:"2035", n:"Jean Douglas Gonsalves de Jesus"}, 
-            {b:"Curitiba", c:"1142", n:"Jeferson Costa de Souza"}, 
-            {b:"Curitiba", c:"1857", n:"Jailton Azeredo dos Santos"}, 
-            {b:"Curitiba", c:"2099", n:"João Barbosa dos Santos"}, 
-            {b:"Curitiba", c:"2091", n:"João Marcos Santana Machado"}, 
-            {b:"Curitiba", c:"1696", n:"Jorge Antonio Silva"}, 
-            {b:"Curitiba", c:"1798", n:"Laerson José de Santana"}, 
-            {b:"Curitiba", c:"1814", n:"Leandro aparecido dos Santos"}, 
-            {b:"Curitiba", c:"1909", n:"Leonardo Francisco da Silva"}, 
-            {b:"Curitiba", c:"1776", n:"Luiz Carlos do Nascimento"}, 
-            {b:"Curitiba", c:"1796", n:"Luiz Carlos Vicente Ferreira"}, 
-            {b:"Curitiba", c:"1788", n:"Luiz Fernando Pinto"}, 
-            {b:"Curitiba", c:"1858", n:"Maicon Rodrigues Ribeiro"}, 
-            {b:"Curitiba", c:"789", n:"Nilton José Rodrigues"}, 
-            {b:"Curitiba", c:"618", n:"Rafael de Souza Santos"}, 
-            {b:"Curitiba", c:"1885", n:"Reinaldo Moreira Filho"}, 
-            {b:"Curitiba", c:"1990", n:"Robisclei dos Santos Joaquim"}, 
-            {b:"Curitiba", c:"2019", n:"Thiago do Nascimento Flor"}, 
-            {b:"Curitiba", c:"1743", n:"William da Conceição David"}, 
-            {b:"Curitiba", c:"1342", n:"Willian Cleyton Siqueira"},
-            {b:"Curitiba", c:"21870", n:"Cesar Augusto Dias dos Santos"},
-
-            // FLORIANÓPOLIS
-            {b:"Florianópolis", c:"1584", n:"Adão Valdecir Oliveira"}, 
-            {b:"Florianópolis", c:"2004", n:"Carlos Alexandre da Costa Wolf"}, 
-            {b:"Florianópolis", c:"2024", n:"Daniel Luiz de Souza Guimarães"}, 
-            {b:"Florianópolis", c:"2058", n:"Ederson Vicente da Silva"}, 
-            {b:"Florianópolis", c:"2101", n:"Edivaldo de Jesus Andrade"},
-            {b:"Florianópolis", c:"1052", n:"Jeferson Luiz da Silva"}, 
-            {b:"Florianópolis", c:"2045", n:"Ferdinando Giareta"}, 
-            {b:"Florianópolis", c:"1923", n:"José Rafael Marques"}, 
-            {b:"Florianópolis", c:"2005", n:"João Vitor Knevitz Cardoso"}, 
-            {b:"Florianópolis", c:"1887", n:"Luis Carlos Pivoto Dorneles"}, 
-            {b:"Florianópolis", c:"1888", n:"Nafael Vieira da Silva"}, 
-            {b:"Florianópolis", c:"2097", n:"Paulo Sergio Rosa Batista"}, 
-            {b:"Florianópolis", c:"2096", n:"Rarisson André Aquino Vieira"}, 
-            {b:"Florianópolis", c:"1753", n:"Rangel Rosa"}, 
-            {b:"Florianópolis", c:"2046", n:"Renan Felipe da Costa"}, 
-            {b:"Florianópolis", c:"1176", n:"Silvano Feijó"},
-
-            // FOZ DO IGUAÇU
-            {b:"Foz do Iguaçu", c:"2007", n:"Cleiton B. de Oliveira"}, 
-            {b:"Foz do Iguaçu", c:"2052", n:"Denivaldo Dorta"}, 
-            {b:"Foz do Iguaçu", c:"2008", n:"Erivaldo Pereira de Macedo"}, 
-            {b:"Foz do Iguaçu", c:"2066", n:"Jean Patrick Cabral Felisberto"}, 
-            {b:"Foz do Iguaçu", c:"2082", n:"Nivaldo de Moraes Sampaio"}, 
-            {b:"Foz do Iguaçu", c:"1953", n:"Renato Freire dos Santos"}, 
-            {b:"Foz do Iguaçu", c:"1662", n:"Sergio Augusto Ribeiro dos Santos"},
-
-            // GOIOERÉ
-            {b:"Goioerê", c:"21806", n:"Allan Araújo de Oliveira"}, 
-            {b:"Goioerê", c:"18328", n:"Alvaro Agostini"}, 
-            {b:"Goioerê", c:"1965", n:"Gabriel Esmeraldo Garcia"}, 
-            {b:"Goioerê", c:"19994", n:"João Alves da Cunha"}, 
-            {b:"Goioerê", c:"21258", n:"José Aparecido Perecin"}, 
-            {b:"Goioerê", c:"20362", n:"Lázaro Aparecido de Lima"}, 
-            {b:"Goioerê", c:"21857", n:"Leonardo Romeiro Alves"}, 
-            {b:"Goioerê", c:"19770", n:"Roberto do Carmo Ubaldino"},
-
-            // GUARAPUAVA
-            {b:"Guarapuava", c:"21479", n:"Ariquemes Junior Carneiro"}, 
-            {b:"Guarapuava", c:"21603", n:"Daniel Pacheco"}, 
-            {b:"Guarapuava", c:"1228", n:"Diego Pires Bueno Moreira"}, 
-            {b:"Guarapuava", c:"21739", n:"Everaldo José Michalesi"}, 
-            {b:"Guarapuava", c:"1900", n:"Ildo de Campos Junior"}, 
-            {b:"Guarapuava", c:"21745", n:"Jociel Pieteniska Fonseca"}, 
-            {b:"Guarapuava", c:"1108", n:"Juliano de Oliveira"}, 
-            {b:"Guarapuava", c:"1210", n:"Julio Pereira Herbst"}, 
-            {b:"Guarapuava", c:"21218", n:"Marcelo Bueno Bertonceli"}, 
-            {b:"Guarapuava", c:"19019", n:"Neivaldo Carmeiro"}, 
-            {b:"Guarapuava", c:"20527", n:"Pedro Celso Santos"}, 
-            {b:"Guarapuava", c:"19622", n:"Romildo Rodrigues da Silva"},
-
-            // IRATI
-            {b:"Irati", c:"1432", n:"Cristiano Alves Kuller"}, 
-            {b:"Irati", c:"2018", n:"Eriton Miranda"}, 
-            {b:"Irati", c:"831", n:"José Bueno"}, 
-            {b:"Irati", c:"2085", n:"Marciel Taborda"}, 
-            {b:"Irati", c:"846", n:"Maurício Quadros"}, 
-            {b:"Irati", c:"1667", n:"Nilton Junior Capote"}, 
-            {b:"Irati", c:"1613", n:"Paulo da Silva Gonsalves"}, 
-            {b:"Irati", c:"830", n:"William Dyego de Oliveira"},
-
-            // LAGES
-            {b:"Lages", c:"1076", n:"Alexandre José Amaral Raulino"}, 
-            {b:"Lages", c:"1691", n:"Alisson Salomão Atanasio"}, 
-            {b:"Lages", c:"1079", n:"Claudio de Souza Santos"}, 
-            {b:"Lages", c:"2002", n:"Ezequiel Petry"}, 
-            {b:"Lages", c:"1964", n:"José Iradi da Silveira Mota"}, 
-            {b:"Lages", c:"2001", n:"Josiel Oliveira de Campos"}, 
-            {b:"Lages", c:"1085", n:"Lindomar Rodrigues"}, 
-            {b:"Lages", c:"1537", n:"Roseraldo Voni Moraes"}, 
-            {b:"Lages", c:"1771", n:"Vanderlei Duarte Camilo"},
-
-            // LONDRINA
-            {b:"Londrina", c:"2068", n:"Anderson dos Anjos Carmargo"}, 
-            {b:"Londrina", c:"2015", n:"Anderson José Hidaldo"}, 
-            {b:"Londrina", c:"2039", n:"Anderson da Silva Bueno"}, 
-            {b:"Londrina", c:"1520", n:"Adriano Aparecido Silverio"}, 
-            {b:"Londrina", c:"505", n:"Adriano José Batista"}, 
-            {b:"Londrina", c:"1906", n:"Allan Junior Costa"}, 
-            {b:"Londrina", c:"1208", n:"Amarildo dos Santos Trento"}, 
-            {b:"Londrina", c:"1015", n:"Cassio Alves de Moura"}, 
-            {b:"Londrina", c:"1961", n:"Claudian Leonel dos Santos"}, 
-            {b:"Londrina", c:"1602", n:"David Cicero Inácio"}, 
-            {b:"Londrina", c:"2022", n:"Edson Rodrigues da Silva"}, 
-            {b:"Londrina", c:"1200", n:"Edival da Silva"}, 
-            {b:"Londrina", c:"1898", n:"Edivandro do Nascimento Ferreira"}, 
-            {b:"Londrina", c:"1677", n:"Everson Alan Momesso"}, 
-            {b:"Londrina", c:"2103", n:"Gerson Henrique Ribeiro"},
-            {b:"Londrina", c:"421", n:"Jaime Carvalho da Costa"}, 
-            {b:"Londrina", c:"587", n:"João Marquesete Filho"}, 
-            {b:"Londrina", c:"1149", n:"Marcelo dos Santos Oliveira"}, 
-            {b:"Londrina", c:"1206", n:"Nilton de Souza Valério"}, 
-            {b:"Londrina", c:"1774", n:"Rodinaldo Carlos Palmeira"}, 
-            {b:"Londrina", c:"21833", n:"Tiago Henrique Borgatto Mendes"}, 
-            {b:"Londrina", c:"1998", n:"Wilson Brescia"},
-
-            // MARINGÁ
-            {b:"Maringá", c:"965", n:"Antonio Carlos de Lima"}, 
-            {b:"Maringá", c:"2064", n:"Irineu Eberson da Silva Lapas"}, 
-            {b:"Maringá", c:"21827", n:"Jonathan Felipe Pereira da Luz"}, 
-            {b:"Maringá", c:"21850", n:"Mário Henrique Gonsalves"},
-
-            // MARILÂNDIA DO SUL
-            {b:"Marilândia do Sul", c:"16349", n:"Antônio Ap. Lourenço"},
-
-            // PARANAVAÍ
-            {b:"Paranavaí", c:"726", n:"Carlos Eduardo Torres Ferreira"}, 
-            {b:"Paranavaí", c:"1614", n:"Emerson Fernandes de Oliveira"}, 
-            {b:"Paranavaí", c:"1216", n:"Junior Mendonça Santos"}, 
-            {b:"Paranavaí", c:"21770", n:"Vanderlei Martins"},
-            {b:"Paranavaí", c:"727", n:"Vinícius José Claudino Santos"}, 
-            {b:"Paranavaí", c:"21828", n:"Wallace Denilson Moreno Moraes"}, 
-            {b:"Paranavaí", c:"21855", n:"William Batista Borges"},
-
-            // PONTA GROSSA
-            {b:"Ponta Grossa", c:"193", n:"Abel de Carvalho"}, 
-            {b:"Ponta Grossa", c:"2081", n:"Alessandro de Jesus Martins dos Santos"}, 
-            {b:"Ponta Grossa", c:"2012", n:"Alisson Fernando Souza"}, 
-            {b:"Ponta Grossa", c:"1963", n:"Anderson Sovinski"}, 
-            {b:"Ponta Grossa", c:"1872", n:"Bruno Lima de Oliveira"}, 
-            {b:"Ponta Grossa", c:"474", n:"Carlos Alves Pereira"}, 
-            {b:"Ponta Grossa", c:"1532", n:"Cesar Cassiano da Silva"}, 
-            {b:"Ponta Grossa", c:"1794", n:"David Ribeiro"}, 
-            {b:"Ponta Grossa", c:"1764", n:"Diego Cristiano de Almeida"}, 
-            {b:"Ponta Grossa", c:"1697", n:"Douglas Ricardo Martins de Araújo"}, 
-            {b:"Ponta Grossa", c:"1676", n:"Douglas Schmitt da Silva"},
-            {b:"Ponta Grossa", c:"1804", n:"Elias Costa Rosa"}, 
-            {b:"Ponta Grossa", c:"2077", n:"Franquen Cezar da Cruz dos Santos"}, 
-            {b:"Ponta Grossa", c:"1725", n:"Geraldo Cesar Rosa de Oliveira"}, 
-            {b:"Ponta Grossa", c:"1973", n:"Jardel Teixeira da Silva"}, 
-            {b:"Ponta Grossa", c:"2051", n:"João Alfredo Dias Silveira"}, 
-            {b:"Ponta Grossa", c:"2050", n:"João Ricardo Quadros Quentin"}, 
-            {b:"Ponta Grossa", c:"632", n:"Joarez Marcelo Valhux"}, 
-            {b:"Ponta Grossa", c:"1971", n:"Mauro Sergio da Silva Junior"}, 
-            {b:"Ponta Grossa", c:"1160", n:"Osmair Moraes de Jesus"}, 
-            {b:"Ponta Grossa", c:"2034", n:"Osnan Ferreira Haas"}, 
-            {b:"Ponta Grossa", c:"952", n:"Paulo Henrique Rodrigues de Mello"}, 
-            {b:"Ponta Grossa", c:"1793", n:"Rafhael de Oliveira Martins"},
-            {b:"Ponta Grossa", c:"2110", n:"Renato Aparecido Nunes de Oliveira"},
-            {b:"Ponta Grossa", c:"2062", n:"Robson Simar Pedroso"}, 
-            {b:"Ponta Grossa", c:"1164", n:"Rodrigo Canani de Paula"},
-
-            // PORTO ALEGRE
-            {b:"Porto Alegre", c:"1060", n:"Adelir Tonieto"}, 
-            {b:"Porto Alegre", c:"1896", n:"Amauri de Jesus"}, 
-            {b:"Porto Alegre", c:"1600", n:"Ari Galvão"}, 
-            {b:"Porto Alegre", c:"990", n:"Denarde Mendes Bandeira"}, 
-            {b:"Porto Alegre", c:"2014", n:"Fabrício da Silva Dinatt"}, 
-            {b:"Porto Alegre", c:"2061", n:"Gilson Abreu"}, 
-            {b:"Porto Alegre", c:"1779", n:"José Antonio Pires Neto"}, 
-            {b:"Porto Alegre", c:"2060", n:"Leandro Aguiar dos Santos"}, 
-            {b:"Porto Alegre", c:"1881", n:"Leandro Quintanilha dos Santos"}, 
-            {b:"Porto Alegre", c:"1930", n:"Matheus Kalata do Amaral"}, 
-            {b:"Porto Alegre", c:"2075", n:"Nathan Quevedo Ribeiro"}, 
-            {b:"Porto Alegre", c:"1977", n:"Paulo Rogério Tenedini"}, 
-            {b:"Porto Alegre", c:"2013", n:"Paulo Victor Nunes Rocha"}, 
-            {b:"Porto Alegre", c:"2030", n:"Vagner da Silva Glapinski"},
-
-            // RONCADOR
-            {b:"Roncador", c:"21852", n:"Alessandro Koziel"}, 
-            {b:"Roncador", c:"19169", n:"Celso Joenk"}, 
-            {b:"Roncador", c:"20988", n:"Diego Carmona de Souza"}, 
-            {b:"Roncador", c:"21563", n:"José Hilareski Junior"}, 
-            {b:"Roncador", c:"751", n:"Valter Rodrigues Carneiro"},
-
-            // PITANGA
-            {b:"Pitanga", c:"16653", n:"Antonio de Jesus de Campos"}, 
-            {b:"Pitanga", c:"19556", n:"Carlos Roberto da Silva"}, 
-            {b:"Pitanga", c:"20210", n:"Claudecir de Araújo"}, 
-            {b:"Pitanga", c:"21747", n:"José de Oliveira"}, 
-            {b:"Pitanga", c:"17969", n:"Mário Sérgio Kuchuruba"}, 
-            {b:"Pitanga", c:"21453", n:"Roberto Rank"}, 
-            {b:"Pitanga", c:"21756", n:"Roni Willian dos Santos Caetano"},
-
-            // SÃO PAULO
-            {b:"São Paulo", c:"2088", n:"Bruce Wybson Ramos Sousa"}, 
-            {b:"São Paulo", c:"1559", n:"Edmilson de Souza Araújo"}, 
-            {b:"São Paulo", c:"1086", n:"Ernesto Leite dos Santos Junior"}, 
-            {b:"São Paulo", c:"2090", n:"Henrique Santos do Nascimento"}, 
-            {b:"São Paulo", c:"1878", n:"Jairo Cordeiro de Oliveira"}, 
-            {b:"São Paulo", c:"2070", n:"Jean da Silva Santos"}, 
-            {b:"São Paulo", c:"1460", n:"José Ferreira da Silva Filho"}, 
-            {b:"São Paulo", c:"2063", n:"Marcio José dos Santos"}, 
-            {b:"São Paulo", c:"2117", n:"Marcelo Ramos de Lima"},
-            {b:"São Paulo", c:"2113", n:"Orley de Melo Brasil"},
-            {b:"São Paulo", c:"2020", n:"Sandro Leite de Moraes"},
-
-            // TOLEDO
-            {b:"Toledo", c:"2121", n:"Alceu Silva de Almeida Junior"},
-            {b:"Toledo", c:"1908", n:"Alexsandro dos Santos de Souza"}, 
-            {b:"Toledo", c:"20572", n:"Calaudino Ribeiro"}, 
-            {b:"Toledo", c:"1852", n:"Calil Ferreira Ramos"}, 
-            {b:"Toledo", c:"19102", n:"Carlos Roberto Santos"}, 
-            {b:"Toledo", c:"21569", n:"Claudenir José da Silva"}, 
-            {b:"Toledo", c:"21748", n:"Diego Rogério de Oliveira Pava"}, 
-            {b:"Toledo", c:"21676", n:"Gilmar Leocadio Alves"}, 
-            {b:"Toledo", c:"21485", n:"José Lucas Barbosa"}, 
-            {b:"Toledo", c:"1834", n:"Luciano Nunes da Silva"}, 
-            {b:"Toledo", c:"21670", n:"Luiz Guilherme Ferreira Pinheiro"}, 
-            {b:"Toledo", c:"20438", n:"Marcio Roberto Kelm"}, 
-            {b:"Toledo", c:"20879", n:"Nilton Batista Maciel"}, 
-            {b:"Toledo", c:"21468", n:"Rafael Augusto de Oliveira"}, 
-            {b:"Toledo", c:"21349", n:"Valmir Dechotti"}
-        ];
-
-        let driverList = [];
-        let db = {}; 
-        let currentApprover = "";
-        let currentDateKey = "";
-        let selectedIndivCad = ""; // Armazena quem foi encontrado na busca
-
-        // --- INICIALIZAÇÃO ---
-        window.onload = function() {
-            const savedApprover = localStorage.getItem('approverName');
-            if (savedApprover) {
-                document.getElementById('approverName').value = savedApprover;
-                currentApprover = savedApprover;
-            }
-
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('datePicker').value = today;
-            
-            // CONEXÃO FIREBASE
-            driversRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    driverList = data;
-                } else {
-                    driverList = defaultDriverList;
-                    driversRef.set(defaultDriverList);
-                }
-                sortDriverList();
-                renderTable();
-            });
-
-            dbRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                db = data || {};
-                renderTable();
-                updateStatus(true);
-            }, (error) => {
-                console.error(error);
-                updateStatus(false);
-            });
-
-            loadDate();
-        };
-
-        function updateStatus(online) {
-            const el = document.getElementById('connectionStatus');
-            if (online) {
-                el.innerHTML = '<i class="fas fa-check-circle"></i> Online e Sincronizado';
-                el.className = 'status-connection status-online';
-            } else {
-                el.innerHTML = '<i class="fas fa-times-circle"></i> Desconectado / Bloqueado';
-                el.className = 'status-connection status-offline';
-            }
-        }
-
-        // --- LÓGICA PRINCIPAL ---
-        function saveConfig() {
-            currentApprover = document.getElementById('approverName').value;
-            localStorage.setItem('approverName', currentApprover);
-        }
-
-        function sortDriverList() {
-            driverList.sort((a, b) => {
-                if (a.b < b.b) return -1;
-                if (a.b > b.b) return 1;
-                return a.n.localeCompare(b.n);
-            });
-        }
-
-        function loadDate() {
-            currentDateKey = document.getElementById('datePicker').value;
-            if (!currentDateKey) return;
-            renderTable();
-        }
-
-        function renderTable() {
-            const container = document.getElementById('tableContainer');
-            if(!container) return;
-            container.innerHTML = "";
-
-            let countOK = 0;
-            let countPending = 0;
-
-            const groups = {};
-            driverList.forEach(d => {
-                if(!groups[d.b]) groups[d.b] = [];
-                groups[d.b].push(d);
-            });
-
-            const dayRecords = db[currentDateKey] || {};
-            const sortedBranches = Object.keys(groups).sort();
-
-            for (const branch of sortedBranches) {
-                const drivers = groups[branch];
-                const block = document.createElement('div');
-                block.className = 'branch-block';
-
-                let html = `
-                    <div class="branch-head">
-                        <span class="branch-name"><i class="fas fa-building"></i> ${branch}</span>
-                        <button class="btn-branch-approve" onclick="approveBranch('${branch}')">
-                            <i class="fas fa-check"></i> Aprovar Filial
-                        </button>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th width="10%">CAD</th>
-                                <th width="25%">Nome</th>
-                                <th width="15%">Status</th>
-                                <th width="20%">Observação (Autorização)</th>
-                                <th width="15%">Aprovador</th>
-                                <th width="15%">Hora Ação</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-
-                drivers.forEach(d => {
-                    const record = dayRecords[d.c]; 
-                    const status = record ? record.status : "Pendente";
-                    const obs = record ? record.obs : "";
-                    const approver = record ? record.approver : "-";
-                    const time = record ? record.time : "-";
-
-                    if (status === 'OK') countOK++;
-                    else countPending++;
-
-                    let badgeClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : 'st-pendente');
-                    let statusLabel = status === 'OK' ? 'Aprovado' : (status === 'Erro' ? 'Reprovado' : 'Pendente');
-
-                    html += `
-                        <tr>
-                            <td><b>${d.c}</b></td>
-                            <td>${d.n}</td>
-                            <td>
-                                <span class="status-badge ${badgeClass}" onclick="cycleStatus('${d.c}')">${statusLabel}</span>
-                            </td>
-                            <td>
-                                <input type="text" class="obs-input" placeholder="..." 
-                                value="${obs}" onblur="saveObs('${d.c}', this.value)">
-                            </td>
-                            <td style="color:var(--brand); font-weight:bold; font-size:11px;">${approver}</td>
-                            <td style="font-size:11px; color:#999;">${time}</td>
-                        </tr>
-                    `;
-                });
-
-                html += `</tbody></table>`;
-                block.innerHTML = html;
-                container.appendChild(block);
-            }
-
-            document.getElementById('count-ok').innerText = countOK;
-            document.getElementById('count-pending').innerText = countPending;
-            document.getElementById('count-total').innerText = driverList.length;
-        }
-
-        // --- FIREBASE ACTIONS ---
-        function cycleStatus(cad) {
-            if (!currentApprover) { alert("Digite o nome de quem está aprovando no topo!"); return; }
-            const currentRecord = (db[currentDateKey] && db[currentDateKey][cad]) ? db[currentDateKey][cad] : null;
-            const currentStatus = currentRecord ? currentRecord.status : "Pendente";
-            let next = "OK";
-            if (currentStatus === "OK") next = "Erro";
-            else if (currentStatus === "Erro") next = "Pendente";
-            const path = `pontos/${currentDateKey}/${cad}`;
-            if (next === "Pendente") database.ref(path).remove();
-            else database.ref(path).set({ status: next, approver: currentApprover, time: new Date().toLocaleTimeString('pt-BR'), obs: currentRecord ? currentRecord.obs : "" });
-        }
-
-        function saveObs(cad, text) {
-            const path = `pontos/${currentDateKey}/${cad}`;
-            const currentRecord = (db[currentDateKey] && db[currentDateKey][cad]) ? db[currentDateKey][cad] : null;
-            if (!currentRecord) database.ref(path).set({ status: "Pendente", approver: "-", time: "-", obs: text });
-            else database.ref(path).update({ obs: text });
-        }
-
-        function approveBranch(branchName) {
-            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
-            if (!confirm(`Aprovar TODOS da filial ${branchName}?`)) return;
-            const timeNow = new Date().toLocaleTimeString('pt-BR');
-            const updates = {};
-            driverList.forEach(d => {
-                if (d.b === branchName) {
-                    const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
-                    updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, obs: currentObs };
-                }
-            });
-            database.ref().update(updates);
-        }
-
-        // --- AÇÕES EM MASSA (DIA) ---
-        function approveAllDaily() {
-            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
-            if (!confirm(`Aprovar TODOS para o dia ${currentDateKey}?`)) return;
-            const timeNow = new Date().toLocaleTimeString('pt-BR');
-            const updates = {};
-            driverList.forEach(d => {
-                const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
-                updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, obs: currentObs };
-            });
-            database.ref().update(updates);
-        }
-
-        function reproveAllDaily() {
-            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
-            if (!confirm(`REPROVAR TODOS para o dia ${currentDateKey}?`)) return;
-            const timeNow = new Date().toLocaleTimeString('pt-BR');
-            const updates = {};
-            driverList.forEach(d => {
-                const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
-                updates[`pontos/${currentDateKey}/${d.c}`] = { status: "Erro", approver: currentApprover, time: timeNow, obs: currentObs };
-            });
-            database.ref().update(updates);
-        }
-
-        function cancelAllDaily() {
-            if (!confirm(`ATENÇÃO: Isso vai LIMPAR (Desfazer) as aprovações de hoje (${currentDateKey}).\nTodos voltarão para PENDENTE.\n\nConfirmar?`)) return;
-            database.ref(`pontos/${currentDateKey}`).remove();
-        }
-
-        // --- AÇÕES EM MASSA (PERÍODO) ---
-        function getPeriodLimits(dateStr) {
-            const current = new Date(dateStr + "T12:00:00");
-            const day = current.getDate();
-            const month = current.getMonth(); 
-            const year = current.getFullYear();
-            let start, end;
-            if (day >= 11) { start = new Date(year, month, 11); end = new Date(year, month + 1, 10); }
-            else { start = new Date(year, month - 1, 11); end = new Date(year, month, 10); }
-            return { start, end };
-        }
-
-        function approvePeriod() {
-            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
-            const limits = getPeriodLimits(currentDateKey);
-            if (!confirm(`Aprovar TUDO de ${limits.start.toLocaleDateString('pt-BR')} até ${limits.end.toLocaleDateString('pt-BR')}?`)) return;
-            const timeNow = new Date().toLocaleTimeString('pt-BR');
-            const updates = {};
-            let loopDate = new Date(limits.start);
-            while (loopDate <= limits.end) {
-                const dateKey = loopDate.toISOString().split('T')[0];
-                driverList.forEach(d => {
-                    const currentObs = (db[dateKey] && db[dateKey][d.c]) ? db[dateKey][d.c].obs : "";
-                    updates[`pontos/${dateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, obs: currentObs };
-                });
-                loopDate.setDate(loopDate.getDate() + 1);
-            }
-            database.ref().update(updates);
-            alert("Aprovando período em massa...");
-        }
-
-        function cancelPeriod() {
-            if (!currentApprover) { alert("Digite seu nome no topo!"); return; }
-            const limits = getPeriodLimits(currentDateKey);
-            
-            if (!confirm(`PERIGO: Você vai CANCELAR (Desfazer) as aprovações de TODOS no período:\nDe: ${limits.start.toLocaleDateString('pt-BR')}\nAté: ${limits.end.toLocaleDateString('pt-BR')}\n\nTodos voltarão para PENDENTE. Tem certeza?`)) return;
-            
-            const updates = {};
-            let loopDate = new Date(limits.start);
-            while (loopDate <= limits.end) {
-                const dateKey = loopDate.toISOString().split('T')[0];
-                // Definir como null remove o nó no Firebase
-                driverList.forEach(d => {
-                    updates[`pontos/${dateKey}/${d.c}`] = null;
-                });
-                loopDate.setDate(loopDate.getDate() + 1);
-            }
-            database.ref().update(updates);
-            alert("Cancelando período em massa... Todos voltando para Pendente.");
-        }
-
-        // --- GESTÃO DE EQUIPE ---
-        function openManageModal() {
-            document.getElementById('manageModal').style.display = 'flex';
-            renderBranchOptions('newBranch');
-            renderManageList();
-        }
-        function closeManageModal() { document.getElementById('manageModal').style.display = 'none'; }
-
-        function renderBranchOptions(elemId) {
-            const branches = [...new Set(driverList.map(d => d.b))].sort();
-            const select = document.getElementById(elemId);
-            select.innerHTML = '<option value="">Selecione a Filial...</option>';
-            branches.forEach(b => {
-                const opt = document.createElement('option');
-                opt.value = b; opt.innerText = b; select.appendChild(opt);
-            });
-        }
-
-        function addDriver() {
-            const cad = document.getElementById('newCad').value.trim();
-            const branch = document.getElementById('newBranch').value;
-            const name = document.getElementById('newName').value.trim();
-            if (!cad || !branch || !name) { alert("Preencha todos os campos!"); return; }
-            if (driverList.find(d => d.c === cad)) { alert("CAD já existe!"); return; }
-            const newList = [...driverList, { b: branch, c: cad, n: name }];
-            driversRef.set(newList);
-            document.getElementById('newCad').value = ""; document.getElementById('newName').value = "";
-            alert("Adicionado!");
-        }
-
-        function removeDriver(cad) {
-            if (!confirm("Remover funcionário?")) return;
-            const newList = driverList.filter(d => d.c !== cad);
-            driversRef.set(newList);
-        }
-
-        function renderManageList() {
-            const listContainer = document.getElementById('manageListContainer');
-            listContainer.innerHTML = "";
-            driverList.forEach(d => {
-                const item = document.createElement('div');
-                item.className = 'manage-item';
-                item.innerHTML = `<span><b>${d.b}</b> - ${d.n} (CAD: ${d.c})</span> <button class="btn-del" onclick="removeDriver('${d.c}')"><i class="fas fa-trash"></i></button>`;
-                listContainer.appendChild(item);
-            });
-        }
-
-        // --- BUSCA E AÇÃO INDIVIDUAL ---
-        function openIndividualModal() {
-            document.getElementById('individualModal').style.display = 'flex';
-            document.getElementById('indivSearchInput').value = "";
-            document.getElementById('indivSearchResult').style.display = 'none';
-            selectedIndivCad = "";
-        }
-        function closeIndividualModal() { document.getElementById('individualModal').style.display = 'none'; }
-
-        function searchDriver() {
-            const term = document.getElementById('indivSearchInput').value.trim().toLowerCase();
-            const resDiv = document.getElementById('indivSearchResult');
-            
-            if (!term) {
-                resDiv.style.display = 'none';
-                return;
-            }
-
-            // Procura exato no CAD ou parcial no nome
-            const found = driverList.find(d => d.c === term || d.n.toLowerCase().includes(term));
-
-            resDiv.style.display = 'block';
-            if (found) {
-                selectedIndivCad = found.c;
-                resDiv.style.background = '#eef6ff';
-                resDiv.style.color = '#0056b3';
-                resDiv.style.borderColor = '#0056b3';
-                resDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>Encontrado:</b><br>${found.n}<br>Filial: ${found.b} (CAD: ${found.c})`;
-            } else {
-                selectedIndivCad = "";
-                resDiv.style.background = '#f8d7da';
-                resDiv.style.color = '#721c24';
-                resDiv.style.borderColor = '#f5c6cb';
-                resDiv.innerHTML = `<i class="fas fa-times-circle"></i> Colaborador não encontrado.<br>Tente digitar o CAD exato.`;
-            }
-        }
-
-        function applyIndividualAction(statusType) {
-            const approver = document.getElementById('approverName').value;
-            if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
-
-            if (!selectedIndivCad) { alert("Por favor, BUSQUE e selecione um colaborador válido primeiro."); return; }
-
-            const startVal = document.getElementById('indivStartDate').value;
-            const endVal = document.getElementById('indivEndDate').value;
-
-            if(!startVal || !endVal) { alert("Preencha as datas!"); return; }
-
-            const start = new Date(startVal + "T12:00:00");
-            const end = new Date(endVal + "T12:00:00");
-
-            if(start > end) { alert("Data Inicial não pode ser maior que a Final!"); return; }
-
-            let actionName = "";
-            if(statusType === 'OK') actionName = "APROVAR";
-            else if(statusType === 'Erro') actionName = "REPROVAR";
-            else actionName = "CANCELAR / VOLTAR (Pendente)";
-
-            if(!confirm(`Ação: ${actionName}\nConfirmar?`)) return;
-
-            const timeNow = new Date().toLocaleTimeString('pt-BR');
-            const updates = {};
-            let loopDate = new Date(start);
-
-            while(loopDate <= end) {
-                const dateKey = loopDate.toISOString().split('T')[0];
-                const path = `pontos/${dateKey}/${selectedIndivCad}`;
-                
-                if(statusType === 'Pendente') {
-                    // Remove do banco (volta a ficar em branco/pendente)
-                    updates[path] = null;
-                } else {
-                    const currentObs = (db[dateKey] && db[dateKey][selectedIndivCad]) ? db[dateKey][selectedIndivCad].obs : "";
-                    updates[path] = {
-                        status: statusType,
-                        approver: approver,
-                        time: timeNow,
-                        obs: currentObs
-                    };
-                }
-                loopDate.setDate(loopDate.getDate() + 1);
-            }
-
-            database.ref().update(updates)
-                .then(() => {
-                    alert("Sucesso!");
-                    closeIndividualModal();
-                })
-                .catch((err) => {
-                    alert("Erro: " + err.message);
-                });
-        }
-
-        // --- EXPORTAR EXCEL ---
-        function exportDay() {
-            sortDriverList();
-            let csv = "\ufeffFilial;CAD;Nome;Data Referencia;Status;Observacao;Aprovador;Hora Acao\n";
-            const dayData = db[currentDateKey] || {};
-            driverList.forEach(d => {
-                const rec = dayData[d.c];
-                const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : 'Pendente')) : "Pendente";
-                const obs = rec ? rec.obs : "";
-                const app = rec ? rec.approver : "";
-                const time = rec ? rec.time : "";
-                csv += `${d.b};${d.c};${d.n};${currentDateKey};${st};${obs};${app};${time}\n`;
-            });
-            downloadCSV(csv, `Ponto_Dia_${currentDateKey}.csv`);
-        }
-
-        function exportPeriodSheet() {
-            sortDriverList();
-            const limits = getPeriodLimits(currentDateKey);
-            let header = "Filial;CAD;Nome";
-            const dateArray = [];
-            let curr = new Date(limits.start);
-            while (curr <= limits.end) {
-                dateArray.push(new Date(curr));
-                const dayStr = curr.getDate().toString().padStart(2, '0');
-                const monthStr = (curr.getMonth() + 1).toString().padStart(2, '0');
-                header += `;${dayStr}/${monthStr}`;
-                curr.setDate(curr.getDate() + 1);
-            }
-            header += "\n";
-
-            let body = "";
-            driverList.forEach(driver => {
-                let row = `${driver.b};${driver.c};${driver.n}`;
-                dateArray.forEach(d => {
-                    const dateKey = d.toISOString().split('T')[0];
-                    const dayData = db[dateKey] || {};
-                    const record = dayData[driver.c];
-                    const status = record ? (record.status === 'OK' ? 'Aprovado' : (record.status === 'Erro' ? 'Reprovado' : 'Pendente')) : 'Pendente';
-                    row += `;${status}`;
-                });
-                body += row + "\n";
-            });
-
-            const fileName = `Matriz_Ponto_${limits.start.toLocaleDateString('pt-BR')}_a_${limits.end.toLocaleDateString('pt-BR')}.csv`;
-            downloadCSV("\ufeff" + header + body, fileName);
-        }
-
-        function downloadCSV(content, fileName) {
-            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = fileName;
-            link.click();
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
