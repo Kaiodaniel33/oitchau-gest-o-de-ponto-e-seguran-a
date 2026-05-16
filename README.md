@@ -78,7 +78,7 @@ Essa integração permite:
 
 ## Sistema de Autenticação
 
-A plataforma possui uma tela de login destinada exclusivamente a gestores e administradores autorizados, restringindo o acesso às funcionalidades internas do sistema.
+A plataforma possui um sistema de autenticação destinado exclusivamente a gestores e administradores autorizados, garantindo maior segurança e controle de acesso às informações internas.
 
 ---
 
@@ -143,18 +143,9 @@ Os relatórios incluem:
 
 ---
 
-# Acesso de Teste / Homologação
-
-Para acesso ao ambiente de testes, utilize as credenciais padrão:
-
-* **Usuário:** `admin`
-* **Senha:** `expresso`
-
----
-
 # Estrutura de Arquivos
 
-```text id="p3z9kl"
+```text id="h7k2ma"
 /
 ├── index.html      # Estrutura principal da aplicação
 ├── style.css       # Interface visual e responsividade
