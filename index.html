@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle Oitchau - Expresso Nordeste</title>
-    
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -37,13 +36,8 @@
         <div class="top-panel">
             <div class="title-box">
                 <h1><i class="fas fa-bus"></i> Expresso Nordeste</h1>
-                <p>Gestão de Ponto - Oitchau (Servidor: oitchauserv)</p>
+                <p>Gestão de Ponto - Oitchau</p>
                 <div id="connectionStatus" class="status-connection status-offline"><i class="fas fa-circle"></i> Conectando...</div>
-            </div>
-
-            <div class="control-group">
-                <label>Data de Referência</label>
-                <input type="date" id="datePicker" onchange="loadDate()">
             </div>
 
             <div class="control-group">
@@ -52,51 +46,16 @@
             </div>
 
             <div class="control-group" style="flex: 1;">
-                <label>Central de Ações Rápida</label>
-                <div class="btn-row">
-                    <div class="action-block">
-                        <span class="action-label">Ações do Dia (Tela)</span>
-                        <div class="action-buttons">
-                            <button class="btn btn-save" onclick="approveAllDaily()" title="Aprovar TODOS deste dia">
-                                <i class="fas fa-check-double"></i> Aprovar Dia
-                            </button>
-                            <button class="btn btn-reprove" onclick="reproveAllDaily()" title="Reprovar TODOS deste dia">
-                                <i class="fas fa-times-circle"></i> Reprovar
-                            </button>
-                            <button class="btn btn-undo" onclick="cancelAllDaily()" title="Limpar/Cancelar Dia">
-                                <i class="fas fa-eraser"></i> Limpar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="action-block no-border">
-                        <span class="action-label">Ações do Período (11 a 10)</span>
-                        <div class="action-buttons">
-                            <button class="btn btn-period-action" onclick="approvePeriod()" title="Aprovar Período de TODOS">
-                                <i class="fas fa-calendar-check"></i> Aprovar Período
-                            </button>
-                            <button class="btn btn-undo" onclick="cancelPeriod()" title="Desfazer/Cancelar Período de TODOS">
-                                <i class="fas fa-undo"></i> Cancelar
-                            </button>
-                            <button class="btn btn-individual" onclick="openIndividualModal()" title="Ação para um só motorista">
-                                <i class="fas fa-user-clock"></i> Individual
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Gestão & Relatórios</label>
+                <label>Exportação e Relatórios</label>
                 <div class="btn-row">
                     <button class="btn btn-manage" onclick="openManageModal()">
-                        <i class="fas fa-users-cog"></i> Equipe
+                        <i class="fas fa-users-cog"></i> Gerenciar Equipe
                     </button>
                     <button class="btn btn-excel-day" onclick="exportDay()">
-                        <i class="fas fa-file-excel"></i> Dia
+                        <i class="fas fa-file-excel"></i> Relatório do Dia
                     </button>
-                    <button class="btn btn-excel-period" onclick="exportPeriodSheet()">
-                        <i class="fas fa-table"></i> Matriz
+                    <button class="btn btn-excel-period" onclick="exportDetailedReport()">
+                        <i class="fas fa-table"></i> Relatório Detalhado (Período)
                     </button>
                     <button class="btn btn-reprove" onclick="sairSistema()" style="margin-left: 10px;">
                         <i class="fas fa-sign-out-alt"></i> Sair
@@ -105,31 +64,82 @@
             </div>
         </div>
 
-        <div class="summary-bar">
-            <div class="card card-ok">
-                <div class="card-icon"><i class="fas fa-check-circle"></i></div>
-                <div class="card-info">
-                    <h3 id="count-ok">0</h3>
-                    <span>Aprovados Hoje</span>
+        <div class="main-tabs">
+            <button class="main-tab active" id="tab-dia" onclick="switchMainTab('dia')"><i class="fas fa-calendar-day"></i> Controle por Dia / Setor</button>
+            <button class="main-tab" id="tab-individual" onclick="switchMainTab('individual')"><i class="fas fa-user-clock"></i> Controle Individual (Por Período)</button>
+        </div>
+
+        <div id="view-dia" class="view-section active">
+            
+            <div class="sector-tabs">
+                <button class="sector-tab active" id="sec-rodoviario" onclick="switchSector('rodoviario')"><i class="fas fa-road"></i> Motoristas Rodoviários</button>
+                <button class="sector-tab" id="sec-fretamento" onclick="switchSector('fretamento')"><i class="fas fa-shuttle-van"></i> Fretamento</button>
+            </div>
+
+            <div class="action-bar-day">
+                <div class="control-group">
+                    <label>Data de Referência</label>
+                    <input type="date" id="datePicker" onchange="loadDate()">
+                </div>
+                <div class="action-buttons-group">
+                    <button class="btn btn-save" onclick="approveAllDaily()"><i class="fas fa-check-double"></i> Aprovar Dia Todo</button>
+                    <button class="btn btn-reprove" onclick="reproveAllDaily()"><i class="fas fa-times-circle"></i> Reprovar Dia Todo</button>
+                    <button class="btn btn-undo" onclick="cancelAllDaily()"><i class="fas fa-eraser"></i> Limpar Dia</button>
                 </div>
             </div>
-            <div class="card card-pending">
-                <div class="card-icon"><i class="fas fa-clock"></i></div>
-                <div class="card-info">
-                    <h3 id="count-pending">0</h3>
-                    <span>Pendentes Hoje</span>
+
+            <div class="summary-bar">
+                <div class="card card-ok">
+                    <div class="card-icon"><i class="fas fa-check-circle"></i></div>
+                    <div class="card-info"><h3 id="count-ok">0</h3><span>Aprovados</span></div>
+                </div>
+                <div class="card card-pending">
+                    <div class="card-icon"><i class="fas fa-clock"></i></div>
+                    <div class="card-info"><h3 id="count-pending">0</h3><span>Pendentes</span></div>
+                </div>
+                <div class="card card-total">
+                    <div class="card-icon"><i class="fas fa-users"></i></div>
+                    <div class="card-info"><h3 id="count-total">0</h3><span>Total do Setor</span></div>
                 </div>
             </div>
-            <div class="card card-total">
-                <div class="card-icon"><i class="fas fa-users"></i></div>
-                <div class="card-info">
-                    <h3 id="count-total">0</h3>
-                    <span>Total da Equipe</span>
+
+            <div id="tableContainer"></div>
+        </div>
+
+        <div id="view-individual" class="view-section">
+            <div class="individual-panel">
+                <div class="indiv-search-area">
+                    <label>1. Buscar Colaborador (CAD ou Nome):</label>
+                    <div style="display:flex; gap:10px; margin-top: 5px;">
+                        <input type="text" id="indivSearchInput" placeholder="Ex: 21001 ou João" onkeydown="if(event.key==='Enter') searchDriver()">
+                        <button class="btn btn-manage" onclick="searchDriver()"><i class="fas fa-search"></i> Buscar</button>
+                    </div>
+                    <div id="indivSearchResult" class="search-result-box"></div>
+                </div>
+
+                <div class="indiv-date-area">
+                    <div class="date-range-row">
+                        <div>
+                            <label>2. Data Inicial:</label>
+                            <input type="date" id="indivStartDate" class="date-input">
+                        </div>
+                        <div>
+                            <label>3. Data Final:</label>
+                            <input type="date" id="indivEndDate" class="date-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="indiv-action-area">
+                    <label>4. Executar Ação no Período para o Colaborador:</label>
+                    <div class="individual-actions">
+                        <button class="btn btn-save" onclick="applyIndividualAction('OK')"><i class="fas fa-check"></i> APROVAR PERÍODO</button>
+                        <button class="btn btn-reprove" onclick="applyIndividualAction('Erro')"><i class="fas fa-times"></i> REPROVAR PERÍODO</button>
+                        <button class="btn btn-undo" onclick="applyIndividualAction('Pendente')"><i class="fas fa-undo"></i> CANCELAR / LIMPAR</button>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div id="tableContainer"></div>
     </div>
 
     <div class="modal-overlay" id="manageModal">
@@ -144,65 +154,24 @@
                     <input type="text" id="newCad" placeholder="Ex: 12345">
                 </div>
                 <div class="input-wrap">
-                    <label>Filial</label>
-                    <select id="newBranch">
-                        <option value="">Selecione a Filial...</option>
-                    </select>
+                    <label>Filial / Operação</label>
+                    <input type="text" id="newBranch" placeholder="Ex: Campo Mourão" list="branchList">
+                    <datalist id="branchList"></datalist>
                 </div>
                 <div class="input-wrap full-width">
                     <label>Nome Completo</label>
-                    <input type="text" id="newName" placeholder="Digite o nome do colaborador">
+                    <input type="text" id="newName" placeholder="Digite apenas o nome completo">
+                </div>
+                <div class="input-wrap full-width">
+                    <label>Setor</label>
+                    <select id="newSector">
+                        <option value="rodoviario">Motorista Rodoviário</option>
+                        <option value="fretamento">Fretamento</option>
+                    </select>
                 </div>
                 <button class="btn btn-save full-width" onclick="addDriver()">+ Adicionar Pessoa à Base</button>
             </div>
             <div class="manage-list" id="manageListContainer"></div>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="individualModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 style="color: #6610f2;"><i class="fas fa-user-clock"></i> Ação Individual</h2>
-                <span class="close-btn" onclick="closeIndividualModal()">✕</span>
-            </div>
-            
-            <div style="display:flex; flex-direction:column; gap:15px;">
-                <div>
-                    <label style="font-size: 12px; font-weight: bold; color: var(--text);">1. Buscar Colaborador (CAD ou Nome):</label>
-                    <div style="display:flex; gap:10px; margin-top: 5px;">
-                        <input type="text" id="indivSearchInput" placeholder="Ex: 21001 ou Anderson" onkeydown="if(event.key==='Enter') searchDriver()" style="flex:1; padding: 10px; border: 1px solid #ccc; border-radius: 6px;">
-                        <button class="btn btn-manage" onclick="searchDriver()"><i class="fas fa-search"></i> Buscar</button>
-                    </div>
-                </div>
-                
-                <div id="indivSearchResult" class="search-result-box">...</div>
-
-                <div class="date-range-row">
-                    <div>
-                        <label>2. Data Inicial:</label>
-                        <input type="date" id="indivStartDate" class="date-input">
-                    </div>
-                    <div>
-                        <label>3. Data Final:</label>
-                        <input type="date" id="indivEndDate" class="date-input">
-                    </div>
-                </div>
-
-                <div>
-                    <label style="font-size: 12px; font-weight: bold; color: var(--text);">4. Executar Ação no Período:</label>
-                    <div class="individual-actions">
-                        <button class="btn btn-save" onclick="applyIndividualAction('OK')">
-                            <i class="fas fa-check"></i> APROVAR
-                        </button>
-                        <button class="btn btn-reprove" onclick="applyIndividualAction('Erro')">
-                            <i class="fas fa-times"></i> REPROVAR
-                        </button>
-                        <button class="btn btn-undo" onclick="applyIndividualAction('Pendente')">
-                            <i class="fas fa-undo"></i> CANCELAR / VOLTAR
-                        </button>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
