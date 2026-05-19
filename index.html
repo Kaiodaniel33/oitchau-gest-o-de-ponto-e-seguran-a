@@ -37,7 +37,7 @@
             <div class="title-box">
                 <h1><i class="fas fa-bus"></i> Expresso Nordeste</h1>
                 <p>Gestão de Ponto - Oitchau</p>
-                <div id="connectionStatus" class="status-connection status-offline"><i class="fas fa-circle"></i> Conectando...</div>
+                <div id="connectionStatus" class="status-connection status-offline"><i class="fas fa-circle"></i> Conectando ao Servidor...</div>
             </div>
 
             <div class="control-group">
@@ -46,16 +46,16 @@
             </div>
 
             <div class="control-group" style="flex: 1;">
-                <label>Exportação e Relatórios</label>
+                <label>Administração e Relatórios</label>
                 <div class="btn-row">
                     <button class="btn btn-manage" onclick="openManageModal()">
-                        <i class="fas fa-users-cog"></i> Gerenciar Equipe
+                        <i class="fas fa-users-cog"></i> Gerenciar Base
                     </button>
                     <button class="btn btn-excel-day" onclick="exportDay()">
                         <i class="fas fa-file-excel"></i> Relatório do Dia
                     </button>
                     <button class="btn btn-excel-period" onclick="exportDetailedReport()">
-                        <i class="fas fa-table"></i> Relatório Detalhado (Período)
+                        <i class="fas fa-table"></i> Relatório do Período
                     </button>
                     <button class="btn btn-reprove" onclick="sairSistema()" style="margin-left: 10px;">
                         <i class="fas fa-sign-out-alt"></i> Sair
@@ -65,8 +65,8 @@
         </div>
 
         <div class="main-tabs">
-            <button class="main-tab active" id="tab-dia" onclick="switchMainTab('dia')"><i class="fas fa-calendar-day"></i> Controle por Dia / Setor</button>
-            <button class="main-tab" id="tab-individual" onclick="switchMainTab('individual')"><i class="fas fa-user-clock"></i> Controle Individual (Por Período)</button>
+            <button class="main-tab active" id="tab-dia" onclick="switchMainTab('dia')"><i class="fas fa-calendar-day"></i> Visão Geral por Dia / Setor</button>
+            <button class="main-tab" id="tab-individual" onclick="switchMainTab('individual')"><i class="fas fa-user-clock"></i> Visão Individual Detalhada</button>
         </div>
 
         <div id="view-dia" class="view-section active">
@@ -99,7 +99,7 @@
                 </div>
                 <div class="card card-total">
                     <div class="card-icon"><i class="fas fa-users"></i></div>
-                    <div class="card-info"><h3 id="count-total">0</h3><span>Total do Setor</span></div>
+                    <div class="card-info"><h3 id="count-total">0</h3><span>Total na Tela</span></div>
                 </div>
             </div>
 
@@ -108,36 +108,53 @@
 
         <div id="view-individual" class="view-section">
             <div class="individual-panel">
-                <div class="indiv-search-area">
-                    <label>1. Buscar Colaborador (CAD ou Nome):</label>
-                    <div style="display:flex; gap:10px; margin-top: 5px;">
-                        <input type="text" id="indivSearchInput" placeholder="Ex: 21001 ou João" onkeydown="if(event.key==='Enter') searchDriver()">
-                        <button class="btn btn-manage" onclick="searchDriver()"><i class="fas fa-search"></i> Buscar</button>
+                
+                <div class="indiv-top-section">
+                    <div class="indiv-search-area">
+                        <label>1. Buscar Colaborador (CAD ou Nome):</label>
+                        <div style="display:flex; gap:10px; margin-top: 5px;">
+                            <input type="text" id="indivSearchInput" placeholder="Ex: 21001 ou João" onkeydown="if(event.key==='Enter') searchDriver()">
+                            <button class="btn btn-manage" onclick="searchDriver()"><i class="fas fa-search"></i> Buscar</button>
+                        </div>
+                        <div id="indivSearchResult" class="search-result-box"></div>
                     </div>
-                    <div id="indivSearchResult" class="search-result-box"></div>
+
+                    <div class="indiv-date-area">
+                        <label>2. Definir Período (Início e Fim):</label>
+                        <div class="date-range-row">
+                            <input type="date" id="indivStartDate" class="date-input" onchange="renderIndividualPeriod()">
+                            <span style="align-self:center; font-weight:bold; color:var(--text-muted);">ATÉ</span>
+                            <input type="date" id="indivEndDate" class="date-input" onchange="renderIndividualPeriod()">
+                        </div>
+                        
+                        <div class="indiv-bulk-actions">
+                            <label>3. Ação Rápida no Período Inteiro:</label>
+                            <div class="individual-actions">
+                                <button class="btn btn-save" onclick="applyIndividualAction('OK')"><i class="fas fa-check-double"></i> Aprovar Tudo</button>
+                                <button class="btn btn-reprove" onclick="applyIndividualAction('Erro')"><i class="fas fa-times-circle"></i> Reprovar Tudo</button>
+                                <button class="btn btn-undo" onclick="applyIndividualAction('Pendente')"><i class="fas fa-eraser"></i> Limpar Tudo</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="indiv-date-area">
-                    <div class="date-range-row">
-                        <div>
-                            <label>2. Data Inicial:</label>
-                            <input type="date" id="indivStartDate" class="date-input">
-                        </div>
-                        <div>
-                            <label>3. Data Final:</label>
-                            <input type="date" id="indivEndDate" class="date-input">
-                        </div>
-                    </div>
+                <div id="indivPeriodContainer" class="indiv-period-container" style="display: none;">
+                    <h3><i class="fas fa-list-alt"></i> Detalhamento Diário do Colaborador</h3>
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th width="15%">Data</th>
+                                <th width="15%">Status Atual</th>
+                                <th width="30%">Observação</th>
+                                <th width="15%">Aprovador</th>
+                                <th width="25%">Ação Individual</th>
+                            </tr>
+                        </thead>
+                        <tbody id="indivPeriodTableBody">
+                            </tbody>
+                    </table>
                 </div>
 
-                <div class="indiv-action-area">
-                    <label>4. Executar Ação no Período para o Colaborador:</label>
-                    <div class="individual-actions">
-                        <button class="btn btn-save" onclick="applyIndividualAction('OK')"><i class="fas fa-check"></i> APROVAR PERÍODO</button>
-                        <button class="btn btn-reprove" onclick="applyIndividualAction('Erro')"><i class="fas fa-times"></i> REPROVAR PERÍODO</button>
-                        <button class="btn btn-undo" onclick="applyIndividualAction('Pendente')"><i class="fas fa-undo"></i> CANCELAR / LIMPAR</button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -145,7 +162,7 @@
     <div class="modal-overlay" id="manageModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2><i class="fas fa-user-plus"></i> Gerenciar Equipe</h2>
+                <h2><i class="fas fa-user-plus"></i> Gerenciar Base de Colaboradores</h2>
                 <span class="close-btn" onclick="closeManageModal()">✕</span>
             </div>
             <div class="add-form">
@@ -169,7 +186,7 @@
                         <option value="fretamento">Fretamento</option>
                     </select>
                 </div>
-                <button class="btn btn-save full-width" onclick="addDriver()">+ Adicionar Pessoa à Base</button>
+                <button class="btn btn-save full-width" onclick="addDriver()"><i class="fas fa-plus"></i> Adicionar à Base</button>
             </div>
             <div class="manage-list" id="manageListContainer"></div>
         </div>
