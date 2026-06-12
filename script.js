@@ -23,7 +23,7 @@ let currentDateKey = "";
 let selectedIndivCad = ""; 
 let currentSector = "rodoviario"; 
 
-// --- BASE DE DADOS LIMPA - (REMOVIDOS TODOS DA LISTA DE DISPENSA / AVISO) ---
+// --- BASE DE DADOS LIMPA ---
 const cleanDriverList = [
     // RODOVIÁRIOS - APUCARANA
     { b: "Apucarana", c: "21001", n: "Anderson Patricio Schatz", t: "rodoviario" },
@@ -393,10 +393,6 @@ const cleanDriverList = [
     { b: "Toledo", c: "21468", n: "Rafael Augusto de Oliveira", t: "rodoviario" },
     { b: "Toledo", c: "21349", n: "Valmir Dechotti", t: "rodoviario" },
     
-    // ==========================================
-    // FRETAMENTO (Limpado do Relatório de Dispensa)
-    // ==========================================
-    
     // FRETAMENTO COAMO
     { b: "Fretamento Coamo", c: "21527", n: "Anderson Nunes Paulista", t: "fretamento" },
     { b: "Fretamento Coamo", c: "21273", n: "Fernando Rodrigo de Lima", t: "fretamento" },
@@ -521,9 +517,8 @@ function initApp() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('datePicker').value = today;
     
-    // GATILHO PARA SUBSTITUIR BASE NO FIREBASE (Limpa dispensa, adiciona faltantes)
     driversRef.once('value', (snapshot) => {
-        driversRef.set(cleanDriverList); // Sobrescreve a base do BD
+        driversRef.set(cleanDriverList);
     });
 
     driversRef.on('value', (snapshot) => {
@@ -538,7 +533,7 @@ function initApp() {
     dbRef.on('value', (snapshot) => {
         db = snapshot.val() || {};
         renderTable();
-        if(selectedIndivCad) renderIndividualPeriod(); // Atualiza tabela individual na hora
+        if(selectedIndivCad) renderIndividualPeriod(); 
         updateStatus(true);
     }, (error) => {
         console.error(error);
@@ -559,7 +554,6 @@ function updateStatus(online) {
     }
 }
 
-// --- LÓGICA PRINCIPAL ---
 function saveConfig() {
     currentApprover = document.getElementById('approverName').value;
     localStorage.setItem('approverName', currentApprover);
@@ -579,6 +573,7 @@ function loadDate() {
     renderTable();
 }
 
+// --- RENDERS COM NOVOS STATUS E ÍCONE DE HISTÓRICO ---
 function renderTable() {
     const container = document.getElementById('tableContainer');
     if(!container) return;
@@ -618,10 +613,10 @@ function renderTable() {
                     <tr>
                         <th width="10%">CAD</th>
                         <th width="25%">Nome</th>
-                        <th width="15%">Status</th>
-                        <th width="20%">Observação / Motivo</th>
-                        <th width="15%">Aprovador</th>
-                        <th width="15%">Hora Ação</th>
+                        <th width="18%">Status</th>
+                        <th width="22%">Observação / Motivo</th>
+                        <th width="13%">Aprovador</th>
+                        <th width="12%">Hora Ação</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -634,18 +629,21 @@ function renderTable() {
             const approver = record ? record.approver : "-";
             const time = record ? record.time : "-";
 
-            if (status === 'OK') countOK++;
+            if (status === 'OK' || status === 'Verificado') countOK++;
             else countPending++;
 
-            let badgeClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : 'st-pendente');
-            let statusLabel = status === 'OK' ? 'Aprovado' : (status === 'Erro' ? 'Reprovado' : 'Pendente');
+            let badgeClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : (status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
+            let statusLabel = status === 'OK' ? 'Aprovado' : (status === 'Erro' ? 'Reprovado' : (status === 'Verificado' ? 'Verificado' : 'Pendente'));
 
             html += `
                 <tr>
                     <td><b>${d.c}</b></td>
                     <td>${d.n}</td>
                     <td>
-                        <span class="status-badge ${badgeClass}" onclick="cycleStatus('${d.c}', '${currentDateKey}')">${statusLabel}</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="status-badge ${badgeClass}" onclick="cycleStatus('${d.c}', '${currentDateKey}')">${statusLabel}</span>
+                            <i class="fas fa-history text-muted" style="cursor:pointer; font-size:14px;" onclick="openHistoryModal('${d.c}', '${currentDateKey}')" title="Ver Histórico"></i>
+                        </div>
                     </td>
                     <td>
                         <input type="text" class="obs-input" placeholder="Justificativa..." 
@@ -671,54 +669,162 @@ function renderTable() {
     document.getElementById('count-total').innerText = totalSector;
 }
 
-// --- FIREBASE ACTIONS ---
+function renderIndividualPeriod() {
+    if (!selectedIndivCad) return;
+    const startVal = document.getElementById('indivStartDate').value;
+    const endVal = document.getElementById('indivEndDate').value;
+
+    if(!startVal || !endVal) {
+        document.getElementById('indivPeriodContainer').style.display = 'none';
+        return;
+    }
+
+    const start = new Date(startVal + "T12:00:00");
+    const end = new Date(endVal + "T12:00:00");
+
+    if(start > end) {
+        document.getElementById('indivPeriodContainer').style.display = 'none';
+        return;
+    }
+
+    document.getElementById('indivPeriodContainer').style.display = 'block';
+    const tbody = document.getElementById('indivPeriodTableBody');
+    tbody.innerHTML = '';
+
+    let loopDate = new Date(start);
+    while (loopDate <= end) {
+        const dateKeyStr = loopDate.toISOString().split('T')[0];
+        const record = (db[dateKeyStr] && db[dateKeyStr][selectedIndivCad]) ? db[dateKeyStr][selectedIndivCad] : null;
+        
+        const status = record ? record.status : "Pendente";
+        const obs = record ? record.obs : "";
+        const approver = record ? record.approver : "-";
+        const time = record ? record.time : "-";
+
+        let badgeClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : (status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
+        let statusLabel = status === 'OK' ? 'Aprovado' : (status === 'Erro' ? 'Reprovado' : (status === 'Verificado' ? 'Verificado' : 'Pendente'));
+        let dataStr = loopDate.toLocaleDateString('pt-BR');
+
+        tbody.innerHTML += `
+            <tr>
+                <td style="font-weight:700; color:var(--text);">${dataStr}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="status-badge ${badgeClass}" style="cursor:default;">${statusLabel}</span>
+                        <i class="fas fa-history text-muted" style="cursor:pointer; font-size:14px;" onclick="openHistoryModal('${selectedIndivCad}', '${dateKeyStr}')" title="Ver Histórico"></i>
+                    </div>
+                </td>
+                <td>
+                    <input type="text" class="obs-input" placeholder="Justificativa / Motivo..." 
+                    value="${obs}" onblur="saveObs('${selectedIndivCad}', '${dateKeyStr}', this.value)">
+                </td>
+                <td>
+                    <div style="font-weight:700; color:var(--brand); font-size:13px;">${approver}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${time}</div>
+                </td>
+                <td>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn btn-save btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'OK')" title="Aprovar este dia"><i class="fas fa-check"></i></button>
+                        <button class="btn btn-reprove btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Erro')" title="Reprovar este dia"><i class="fas fa-times"></i></button>
+                        <button class="btn btn-undo btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Pendente')" title="Voltar Pendente"><i class="fas fa-undo"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `;
+        loopDate.setDate(loopDate.getDate() + 1);
+    }
+}
+
+// --- CICLOS E LOGS COM DATA DA REALIZAÇÃO ---
 function cycleStatus(cad, dateKeyStr) {
     if (!currentApprover) { alert("Insira seu nome no topo da tela para aprovar!"); return; }
     const currentRecord = (db[dateKeyStr] && db[dateKeyStr][cad]) ? db[dateKeyStr][cad] : null;
     const currentStatus = currentRecord ? currentRecord.status : "Pendente";
-    let next = "OK";
     
-    if (currentStatus === "OK") next = "Erro";
-    else if (currentStatus === "Erro") next = "Pendente";
+    let next = "OK";
+    if (currentStatus === "Pendente") next = "OK";
+    else if (currentStatus === "OK") next = "Erro";
+    else if (currentStatus === "Erro") next = "Verificado";
+    else if (currentStatus === "Verificado") next = "Pendente";
     
     const path = `pontos/${dateKeyStr}/${cad}`;
-    if (next === "Pendente") database.ref(path).remove();
-    else database.ref(path).set({ status: next, approver: currentApprover, time: new Date().toLocaleTimeString('pt-BR'), obs: currentRecord ? currentRecord.obs : "" });
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
+    
+    let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+    const logId = Date.now() + "_" + Math.floor(Math.random() * 1000);
+    
+    historyObj[logId] = {
+        status: next,
+        approver: currentApprover,
+        time: timeNow,
+        actionDate: dateRealization
+    };
+
+    database.ref(path).set({ 
+        status: next, 
+        approver: currentApprover, 
+        time: timeNow, 
+        actionDate: dateRealization, 
+        obs: currentRecord ? currentRecord.obs : "",
+        history: historyObj
+    });
 }
 
 function saveObs(cad, dateKeyStr, text) {
     const path = `pontos/${dateKeyStr}/${cad}`;
     const currentRecord = (db[dateKeyStr] && db[dateKeyStr][cad]) ? db[dateKeyStr][cad] : null;
-    if (!currentRecord) database.ref(path).set({ status: "Pendente", approver: "-", time: "-", obs: text });
-    else database.ref(path).update({ obs: text });
+    if (!currentRecord) {
+        const timeNow = new Date().toLocaleTimeString('pt-BR');
+        const dateRealization = new Date().toLocaleDateString('pt-BR');
+        let historyObj = {};
+        historyObj[Date.now()] = { status: "Pendente", approver: "-", time: timeNow, actionDate: dateRealization };
+        database.ref(path).set({ status: "Pendente", approver: "-", time: timeNow, actionDate: dateRealization, obs: text, history: historyObj });
+    } else {
+        database.ref(path).update({ obs: text });
+    }
 }
 
 function approveBranch(branchName) {
     if (!currentApprover) { alert("Insira seu nome no topo da tela!"); return; }
     if (!confirm(`Confirmar aprovação de TODOS os motoristas exibidos na filial ${branchName}?`)) return;
     const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
     const updates = {};
+    let idx = 0;
+
     driverList.forEach(d => {
         const tipo = d.t || 'rodoviario';
         if (d.b === branchName && tipo === currentSector) {
-            const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, obs: currentObs };
+            const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
+            const currentObs = currentRecord ? currentRecord.obs : "";
+            let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+            
+            historyObj[Date.now() + "_" + (idx++)] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization };
+            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
         }
     });
     database.ref().update(updates);
 }
 
-// --- AÇÕES EM MASSA (DIA/SETOR) ---
+// --- AÇÕES EM MASSA ---
 function approveAllDaily() {
     if (!currentApprover) { alert("Nome de Aprovador Obrigatório!"); return; }
     if (!confirm(`Aprovar TODOS os colaboradores (${currentSector.toUpperCase()}) da tela do dia ${currentDateKey}?`)) return;
     const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
     const updates = {};
+    let idx = 0;
+
     driverList.forEach(d => {
         const tipo = d.t || 'rodoviario';
         if(tipo === currentSector) {
-            const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, obs: currentObs };
+            const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
+            const currentObs = currentRecord ? currentRecord.obs : "";
+            let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+            
+            historyObj[Date.now() + "_" + (idx++)] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization };
+            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
         }
     });
     database.ref().update(updates);
@@ -728,27 +834,83 @@ function reproveAllDaily() {
     if (!currentApprover) { alert("Nome de Aprovador Obrigatório!"); return; }
     if (!confirm(`REPROVAR TODOS os colaboradores (${currentSector.toUpperCase()}) para o dia ${currentDateKey}?`)) return;
     const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
     const updates = {};
+    let idx = 0;
+
     driverList.forEach(d => {
         const tipo = d.t || 'rodoviario';
         if(tipo === currentSector) {
-            const currentObs = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c].obs : "";
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "Erro", approver: currentApprover, time: timeNow, obs: currentObs };
+            const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
+            const currentObs = currentRecord ? currentRecord.obs : "";
+            let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+            
+            historyObj[Date.now() + "_" + (idx++)] = { status: "Erro", approver: currentApprover, time: timeNow, actionDate: dateRealization };
+            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "Erro", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
         }
     });
     database.ref().update(updates);
 }
 
 function cancelAllDaily() {
-    if (!confirm(`Isso vai LIMPAR e desfazer todas as aprovações de HOJE na tela atual.\nConfirmar?`)) return;
+    if (!confirm(`Isso vai LIMPAR e deixar PENDENTE todas as aprovações de HOJE na tela atual.\nConfirmar?`)) return;
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
     const updates = {};
+    let idx = 0;
+
     driverList.forEach(d => {
         const tipo = d.t || 'rodoviario';
         if(tipo === currentSector && db[currentDateKey] && db[currentDateKey][d.c]) {
-            updates[`pontos/${currentDateKey}/${d.c}`] = null;
+            const currentRecord = db[currentDateKey][d.c];
+            const currentObs = currentRecord.obs || "";
+            let historyObj = currentRecord.history ? currentRecord.history : {};
+            
+            historyObj[Date.now() + "_" + (idx++)] = { status: "Pendente", approver: currentApprover || "Sistema", time: timeNow, actionDate: dateRealization };
+            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "Pendente", approver: currentApprover || "Sistema", time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
         }
     });
     database.ref().update(updates);
+}
+
+// --- MODAL DE HISTÓRICO JS ---
+function openHistoryModal(cad, dateKeyStr) {
+    document.getElementById('historyModal').style.display = 'flex';
+    const contentDiv = document.getElementById('historyModalContent');
+    contentDiv.innerHTML = '<p style="color:var(--text-muted); font-size:14px; text-align:center;">Carregando logs...</p>';
+    
+    const record = (db[dateKeyStr] && db[dateKeyStr][cad]) ? db[dateKeyStr][cad] : null;
+    if (!record || !record.history || Object.keys(record.history).length === 0) {
+        contentDiv.innerHTML = '<p style="color:var(--text-muted); font-size:14px; text-align:center; padding: 20px;">Nenhum histórico registrado para este ponto ainda.</p>';
+        return;
+    }
+    
+    let html = '<div style="display:flex; flex-direction:column; gap:12px; padding: 5px 0;">';
+    const sortedKeys = Object.keys(record.history).sort();
+    
+    sortedKeys.forEach(key => {
+        const log = record.history[key];
+        let badgeClass = log.status === 'OK' ? 'st-ok' : (log.status === 'Erro' ? 'st-erro' : (log.status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
+        let statusLabel = log.status === 'OK' ? 'Aprovado' : (log.status === 'Erro' ? 'Reprovado' : (log.status === 'Verificado' ? 'Verificado' : 'Pendente'));
+        
+        html += `
+            <div style="background:#F8FAFC; border:1px solid var(--border); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="status-badge ${badgeClass}" style="cursor:default; width:auto; padding:4px 10px; font-size:11px;">${statusLabel}</span>
+                    <span style="font-size:11px; color:var(--text-muted); font-weight:600;">Realizado em: ${log.actionDate || '-'} às ${log.time || '-'}</span>
+                </div>
+                <div style="font-size:13px; color:var(--text); font-weight:500;">
+                    <i class="fas fa-user-shield" style="color:var(--brand); margin-right:4px;"></i> Por: <b>${log.approver}</b>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    contentDiv.innerHTML = html;
+}
+
+function closeHistoryModal() {
+    document.getElementById('historyModal').style.display = 'none';
 }
 
 // --- GESTÃO DE EQUIPE ---
@@ -803,7 +965,7 @@ function renderManageList() {
     });
 }
 
-// --- BUSCA E AÇÃO INDIVIDUAL (NOVO PAINEL COMPLETO) ---
+// --- BUSCA INDIVIDUAL DETALHADA ---
 function searchDriver() {
     const term = document.getElementById('indivSearchInput').value.trim().toLowerCase();
     const resDiv = document.getElementById('indivSearchResult');
@@ -831,87 +993,22 @@ function searchDriver() {
     }
 }
 
-// Renderiza a lista de todos os dias do motorista na tela individual
-function renderIndividualPeriod() {
-    if (!selectedIndivCad) return;
-    const startVal = document.getElementById('indivStartDate').value;
-    const endVal = document.getElementById('indivEndDate').value;
-
-    if(!startVal || !endVal) {
-        document.getElementById('indivPeriodContainer').style.display = 'none';
-        return;
-    }
-
-    const start = new Date(startVal + "T12:00:00");
-    const end = new Date(endVal + "T12:00:00");
-
-    if(start > end) {
-        document.getElementById('indivPeriodContainer').style.display = 'none';
-        return;
-    }
-
-    document.getElementById('indivPeriodContainer').style.display = 'block';
-    const tbody = document.getElementById('indivPeriodTableBody');
-    tbody.innerHTML = '';
-
-    let loopDate = new Date(start);
-    while (loopDate <= end) {
-        const dateKeyStr = loopDate.toISOString().split('T')[0];
-        const record = (db[dateKeyStr] && db[dateKeyStr][selectedIndivCad]) ? db[dateKeyStr][selectedIndivCad] : null;
-        
-        const status = record ? record.status : "Pendente";
-        const obs = record ? record.obs : "";
-        const approver = record ? record.approver : "-";
-        const time = record ? record.time : "-";
-
-        let badgeClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : 'st-pendente');
-        let statusLabel = status === 'OK' ? 'Aprovado' : (status === 'Erro' ? 'Reprovado' : 'Pendente');
-        let dataStr = loopDate.toLocaleDateString('pt-BR');
-
-        tbody.innerHTML += `
-            <tr>
-                <td style="font-weight:700; color:var(--text);">${dataStr}</td>
-                <td>
-                    <span class="status-badge ${badgeClass}" style="cursor:default;">${statusLabel}</span>
-                </td>
-                <td>
-                    <input type="text" class="obs-input" placeholder="Justificativa / Motivo..." 
-                    value="${obs}" onblur="saveObs('${selectedIndivCad}', '${dateKeyStr}', this.value)">
-                </td>
-                <td>
-                    <div style="font-weight:700; color:var(--brand); font-size:13px;">${approver}</div>
-                    <div style="font-size:11px; color:var(--text-muted);">${time}</div>
-                </td>
-                <td>
-                    <div style="display:flex; gap:5px;">
-                        <button class="btn btn-save btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'OK')" title="Aprovar este dia"><i class="fas fa-check"></i></button>
-                        <button class="btn btn-reprove btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Erro')" title="Reprovar este dia"><i class="fas fa-times"></i></button>
-                        <button class="btn btn-undo btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Pendente')" title="Desfazer este dia"><i class="fas fa-undo"></i></button>
-                    </div>
-                </td>
-            </tr>
-        `;
-        loopDate.setDate(loopDate.getDate() + 1);
-    }
-}
-
-// Ação de APROVAR/REPROVAR UM ÚNICO DIA na tela individual
 function applyIndividualDayAction(dateKeyStr, statusType) {
     const approver = document.getElementById('approverName').value;
     if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
 
     const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
     const path = `pontos/${dateKeyStr}/${selectedIndivCad}`;
+    const currentRecord = (db[dateKeyStr] && db[dateKeyStr][selectedIndivCad]) ? db[dateKeyStr][selectedIndivCad] : null;
+    const currentObs = currentRecord ? currentRecord.obs : "";
+    
+    let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+    historyObj[Date.now()] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization };
 
-    if(statusType === 'Pendente') {
-        database.ref(path).remove();
-    } else {
-        const currentObs = (db[dateKeyStr] && db[dateKeyStr][selectedIndivCad]) ? db[dateKeyStr][selectedIndivCad].obs : "";
-        database.ref(path).set({ status: statusType, approver: approver, time: timeNow, obs: currentObs });
-    }
+    database.ref(path).set({ status: statusType, approver: approver, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj });
 }
 
-// Ação de APROVAR/REPROVAR O PERÍODO INTEIRO na tela individual
 function applyIndividualAction(statusType) {
     const approver = document.getElementById('approverName').value;
     if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
@@ -927,23 +1024,25 @@ function applyIndividualAction(statusType) {
 
     if(start > end) { alert("A Data Inicial não pode ser maior que a Final!"); return; }
 
-    let actionName = statusType === 'OK' ? "APROVAR TODO O PERÍODO" : (statusType === 'Erro' ? "REPROVAR TODO O PERÍODO" : "CANCELAR E LIMPAR TODO O PERÍODO");
+    let actionName = statusType === 'OK' ? "APROVAR TODO O PERÍODO" : (statusType === 'Erro' ? "REPROVAR TODO O PERÍODO" : "DEIXAR TODO O PERÍODO PENDENTE");
     if(!confirm(`${actionName}\n\nTem certeza que deseja aplicar isso para todos os dias entre ${start.toLocaleDateString('pt-BR')} e ${end.toLocaleDateString('pt-BR')}?`)) return;
 
     const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
     const updates = {};
     let loopDate = new Date(start);
+    let idx = 0;
 
     while(loopDate <= end) {
         const dateKey = loopDate.toISOString().split('T')[0];
         const path = `pontos/${dateKey}/${selectedIndivCad}`;
+        const currentRecord = (db[dateKey] && db[dateKey][selectedIndivCad]) ? db[dateKey][selectedIndivCad] : null;
+        const currentObs = currentRecord ? currentRecord.obs : "";
         
-        if(statusType === 'Pendente') {
-            updates[path] = null;
-        } else {
-            const currentObs = (db[dateKey] && db[dateKey][selectedIndivCad]) ? db[dateKey][selectedIndivCad].obs : "";
-            updates[path] = { status: statusType, approver: approver, time: timeNow, obs: currentObs };
-        }
+        let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+        historyObj[Date.now() + "_" + (idx++)] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization };
+
+        updates[path] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
         loopDate.setDate(loopDate.getDate() + 1);
     }
 
@@ -952,7 +1051,7 @@ function applyIndividualAction(statusType) {
         .catch((err) => alert("Erro: " + err.message));
 }
 
-// --- EXPORTAR EXCEL ---
+// --- EXPORTAR EXCEL (Mapeado com novos status e data de realização) ---
 function downloadCSV(content, fileName) {
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -963,18 +1062,19 @@ function downloadCSV(content, fileName) {
 
 function exportDay() {
     sortDriverList();
-    let csv = "\ufeffFilial;Setor;CAD;Nome;Data Referencia;Status;Observacao;Aprovador;Hora Acao\n";
+    let csv = "\ufeffFilial;Setor;CAD;Nome;Data Referencia;Status;Observacao;Aprovador;Hora Acao;Data Execucao\n";
     const dayData = db[currentDateKey] || {};
     
     driverList.forEach(d => {
         const rec = dayData[d.c];
-        const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : 'Pendente')) : "Pendente";
+        const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : (rec.status === 'Verificado' ? 'Verificado' : 'Pendente'))) : "Pendente";
         const obs = rec ? rec.obs : "";
         const app = rec ? rec.approver : "";
         const time = rec ? rec.time : "";
+        const actD = rec ? (rec.actionDate || currentDateKey) : "";
         const tipo = d.t === 'fretamento' ? 'Fretamento' : 'Rodoviario';
         
-        csv += `${d.b};${tipo};${d.c};${d.n};${currentDateKey};${st};${obs};${app};${time}\n`;
+        csv += `${d.b};${tipo};${d.c};${d.n};${currentDateKey};${st};${obs};${app};${time};${actD}\n`;
     });
     downloadCSV(csv, `ExpressoNordeste_PontoDia_${currentDateKey}.csv`);
 }
@@ -990,11 +1090,10 @@ function getPeriodLimits(dateStr) {
     return { start, end };
 }
 
-// Relatório Detalhado (Linha a Linha com Hora e Aprovador)
 function exportDetailedReport() {
     sortDriverList();
     const limits = getPeriodLimits(currentDateKey);
-    let csv = "\ufeffFilial;Setor;CAD;Nome;Data do Ponto;Status;Observacao;Aprovador;Hora Acao\n";
+    let csv = "\ufeffFilial;Setor;CAD;Nome;Data do Ponto;Status;Observacao;Aprovador;Hora Acao;Data Execucao\n";
     
     let loopDate = new Date(limits.start);
     while (loopDate <= limits.end) {
@@ -1003,14 +1102,15 @@ function exportDetailedReport() {
         
         driverList.forEach(d => {
             const rec = dayData[d.c];
-            const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : 'Pendente')) : "Pendente";
+            const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : (rec.status === 'Verificado' ? 'Verificado' : 'Pendente'))) : "Pendente";
             const obs = rec ? rec.obs : "";
             const app = rec ? rec.approver : "";
             const time = rec ? rec.time : "";
+            const actD = rec ? (rec.actionDate || loopDate.toLocaleDateString('pt-BR')) : "";
             const tipo = d.t === 'fretamento' ? 'Fretamento' : 'Rodoviario';
             const dataFormatada = loopDate.toLocaleDateString('pt-BR');
             
-            csv += `${d.b};${tipo};${d.c};${d.n};${dataFormatada};${st};${obs};${app};${time}\n`;
+            csv += `${d.b};${tipo};${d.c};${d.n};${dataFormatada};${st};${obs};${app};${time};${actD}\n`;
         });
         loopDate.setDate(loopDate.getDate() + 1);
     }
