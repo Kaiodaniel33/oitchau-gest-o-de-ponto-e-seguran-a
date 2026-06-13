@@ -14,7 +14,7 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const dbRef = database.ref('pontos');
 const driversRef = database.ref('equipe');
-const escalaRef = database.ref('escala_pedidos'); // NOVO BANCO DA ESCALA
+const escalaRef = database.ref('escala_pedidos'); 
 
 // --- VARIÁVEIS GLOBAIS ---
 let driverList = [];
@@ -24,8 +24,9 @@ let currentApprover = "";
 let currentDateKey = "";
 let selectedIndivCad = ""; 
 let currentSector = "rodoviario"; 
+let currentEscalaFilter = "pendentes";
 
-// --- BASE DE DADOS LIMPA (MANTIDA INTACTA DA SUA LISTA) ---
+// --- BASE DE DADOS COMPLETA OFICIAL ---
 const cleanDriverList = [
     // RODOVIÁRIOS - APUCARANA
     { b: "Apucarana", c: "21001", n: "Anderson Patricio Schatz", t: "rodoviario" },
@@ -466,19 +467,15 @@ const cleanDriverList = [
     { b: "Fretamento JBS", c: "2139", n: "Vanessa Prado de Paula", t: "fretamento" }
 ];
 
-// --- SISTEMA DE LOGIN ---
+// --- LOGIN ---
 function realizarLogin(e) {
     e.preventDefault();
-    const user = document.getElementById('username').value;
-    const pass = document.getElementById('password').value;
-    const errorMsg = document.getElementById('loginError');
-
-    if (user === 'admin' && pass === 'expresso') {
+    if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === 'expresso') {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
         initApp(); 
     } else {
-        errorMsg.style.display = 'block';
+        document.getElementById('loginError').style.display = 'block';
     }
 }
 
@@ -490,13 +487,13 @@ function sairSistema() {
     document.getElementById('loginError').style.display = 'none';
 }
 
-// --- NAVEGAÇÃO DE ABAS ---
 function switchMainTab(tabName) {
     document.querySelectorAll('.main-tab').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
     document.getElementById('tab-' + tabName).classList.add('active');
     document.getElementById('view-' + tabName).classList.add('active');
     if(tabName === 'escala') renderEscalaTable();
+    if(tabName === 'relatorio') renderRelatorioDia();
 }
 
 function switchSector(sector) {
@@ -506,30 +503,20 @@ function switchSector(sector) {
     renderTable();
 }
 
-// --- INICIALIZAÇÃO DO APP ---
 function initApp() {
     const savedApprover = localStorage.getItem('approverName');
-    if (savedApprover) {
-        document.getElementById('approverName').value = savedApprover;
-        currentApprover = savedApprover;
-    } else {
-        document.getElementById('approverName').value = "Kaio";
-        currentApprover = "Kaio";
-    }
+    document.getElementById('approverName').value = savedApprover ? savedApprover : "Kaio";
+    currentApprover = document.getElementById('approverName').value;
 
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('datePicker').value = today;
     document.getElementById('escDataRef').value = today;
     
-    driversRef.once('value', (snapshot) => { driversRef.set(cleanDriverList); });
+    driversRef.once('value', () => { driversRef.set(cleanDriverList); });
 
     driversRef.on('value', (snapshot) => {
         const data = snapshot.val();
-        if (data) {
-            driverList = data;
-            sortDriverList();
-            renderTable();
-        }
+        if (data) { driverList = data; sortDriverList(); renderTable(); }
     });
 
     dbRef.on('value', (snapshot) => {
@@ -537,10 +524,7 @@ function initApp() {
         renderTable();
         if(selectedIndivCad) renderIndividualPeriod(); 
         updateStatus(true);
-    }, (error) => {
-        console.error(error);
-        updateStatus(false);
-    });
+    }, () => { updateStatus(false); });
 
     escalaRef.on('value', (snapshot) => {
         escalaData = snapshot.val() || {};
@@ -552,13 +536,8 @@ function initApp() {
 
 function updateStatus(online) {
     const el = document.getElementById('connectionStatus');
-    if (online) {
-        el.innerHTML = '<i class="fas fa-check-circle"></i> Sincronizado ao Servidor';
-        el.className = 'status-connection status-online';
-    } else {
-        el.innerHTML = '<i class="fas fa-times-circle"></i> Servidor Offline';
-        el.className = 'status-connection status-offline';
-    }
+    el.innerHTML = online ? '<i class="fas fa-check-circle"></i> Sincronizado ao Servidor' : '<i class="fas fa-times-circle"></i> Servidor Offline';
+    el.className = online ? 'status-connection status-online' : 'status-connection status-offline';
 }
 
 function saveConfig() {
@@ -576,24 +555,20 @@ function sortDriverList() {
 
 function loadDate() {
     currentDateKey = document.getElementById('datePicker').value;
-    if (!currentDateKey) return;
-    renderTable();
+    if (currentDateKey) renderTable();
 }
 
-// --- FIM DOS CLIQUES INFINITOS: MENU DE SELEÇÃO NO VISÃO DIA ---
+// --- RENDERS DO PONTO COM SELECT DIRETO E CARD REPROVADOS ---
 function renderTable() {
     const container = document.getElementById('tableContainer');
     if(!container) return;
     container.innerHTML = "";
 
-    let countOK = 0;
-    let countPending = 0;
-    let totalSector = 0;
+    let countOK = 0, countPending = 0, countErro = 0, totalSector = 0;
 
     const groups = {};
     driverList.forEach(d => {
-        const tipo = d.t || 'rodoviario';
-        if(tipo === currentSector) {
+        if((d.t || 'rodoviario') === currentSector) {
             if(!groups[d.b]) groups[d.b] = [];
             groups[d.b].push(d);
             totalSector++;
@@ -611,9 +586,7 @@ function renderTable() {
         let html = `
             <div class="branch-head">
                 <span class="branch-name"><i class="fas fa-map-marker-alt"></i> ${branch}</span>
-                <button class="btn-branch-approve" onclick="approveBranch('${branch}')">
-                    <i class="fas fa-check"></i> Aprovar Filial (Tela)
-                </button>
+                <button class="btn-branch-approve" onclick="approveBranch('${branch}')"><i class="fas fa-check"></i> Aprovar Filial</button>
             </div>
             <table class="modern-table">
                 <thead>
@@ -637,6 +610,7 @@ function renderTable() {
             const time = record ? record.time : "-";
 
             if (status === 'OK' || status === 'Verificado') countOK++;
+            else if (status === 'Erro') countErro++;
             else countPending++;
 
             let selectClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : (status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
@@ -657,8 +631,7 @@ function renderTable() {
                         </div>
                     </td>
                     <td>
-                        <input type="text" class="obs-input" placeholder="Justificativa..." 
-                        value="${obs}" onblur="saveObs('${d.c}', '${currentDateKey}', this.value)">
+                        <input type="text" class="obs-input" placeholder="Justificativa..." value="${obs}" onblur="saveObs('${d.c}', '${currentDateKey}', this.value)">
                     </td>
                     <td style="color:var(--brand); font-weight:700; font-size:12px;">${approver}</td>
                     <td style="font-size:12px; color:var(--text-muted);">${time}</td>
@@ -671,19 +644,14 @@ function renderTable() {
         container.appendChild(block);
     }
 
-    if (totalSector === 0) {
-        container.innerHTML = `<div style="text-align:center; padding: 40px; color:var(--text-muted); font-size:16px;">Nenhum colaborador na base para o setor: <b>${currentSector === 'rodoviario' ? 'Rodoviário' : 'Fretamento'}</b>.</div>`;
-    }
-
     document.getElementById('count-ok').innerText = countOK;
     document.getElementById('count-pending').innerText = countPending;
+    document.getElementById('count-erro').innerText = countErro;
     document.getElementById('count-total').innerText = totalSector;
 }
 
-// Muda o status através do select dropdown direto
 function changeStatusDirect(cad, dateKeyStr, novoStatus) {
-    if (!currentApprover) { alert("Insira seu nome no topo da tela para alterar status!"); return; }
-    
+    if (!currentApprover) { alert("Insira seu nome no topo da tela para alterar status!"); renderTable(); return; }
     const path = `pontos/${dateKeyStr}/${cad}`;
     const timeNow = new Date().toLocaleTimeString('pt-BR');
     const dateRealization = new Date().toLocaleDateString('pt-BR');
@@ -691,16 +659,9 @@ function changeStatusDirect(cad, dateKeyStr, novoStatus) {
     let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
     
     historyObj[Date.now()] = { status: novoStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization };
-
-    if (novoStatus === "Pendente" && !currentRecord) return; // Não faz nada se já não existir
-
     database.ref(path).set({ 
-        status: novoStatus, 
-        approver: currentApprover, 
-        time: timeNow, 
-        actionDate: dateRealization, 
-        obs: currentRecord ? currentRecord.obs : "",
-        history: historyObj
+        status: novoStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization, 
+        obs: currentRecord ? currentRecord.obs : "", history: historyObj
     });
 }
 
@@ -718,28 +679,20 @@ function saveObs(cad, dateKeyStr, text) {
     }
 }
 
-// --- AÇÕES EM MASSA ---
 function actionAllDaily(targetStatus) {
     if (!currentApprover) { alert("Nome de Aprovador Obrigatório!"); return; }
-    let confirmMsg = targetStatus === 'OK' ? "APROVAR" : (targetStatus === 'Erro' ? "REPROVAR" : (targetStatus === 'Verificado' ? "VERIFICAR" : "LIMPAR E PENDENCIAR"));
-    if (!confirm(`Deseja ${confirmMsg} TODOS os colaboradores (${currentSector.toUpperCase()}) da tela do dia ${currentDateKey}?`)) return;
-    
     const timeNow = new Date().toLocaleTimeString('pt-BR');
     const dateRealization = new Date().toLocaleDateString('pt-BR');
     const updates = {};
     let idx = 0;
 
     driverList.forEach(d => {
-        const tipo = d.t || 'rodoviario';
-        if(tipo === currentSector) {
-            if(targetStatus === 'Pendente' && (!db[currentDateKey] || !db[currentDateKey][d.c])) return; // Skip if already empty
-            
+        if((d.t || 'rodoviario') === currentSector) {
+            if(targetStatus === 'Pendente' && (!db[currentDateKey] || !db[currentDateKey][d.c])) return;
             const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
-            const currentObs = currentRecord ? currentRecord.obs : "";
             let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-            
             historyObj[Date.now() + "_" + (idx++)] = { status: targetStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization };
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: targetStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
+            updates[`pontos/${currentDateKey}/${d.c}`] = { status: targetStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentRecord ? currentRecord.obs : "", history: historyObj };
         }
     });
     database.ref().update(updates);
@@ -752,21 +705,17 @@ function cancelAllDaily() { actionAllDaily('Pendente'); }
 
 function approveBranch(branchName) {
     if (!currentApprover) { alert("Insira seu nome no topo da tela!"); return; }
-    if (!confirm(`Confirmar aprovação de TODOS os motoristas exibidos na filial ${branchName}?`)) return;
     const timeNow = new Date().toLocaleTimeString('pt-BR');
     const dateRealization = new Date().toLocaleDateString('pt-BR');
     const updates = {};
     let idx = 0;
 
     driverList.forEach(d => {
-        const tipo = d.t || 'rodoviario';
-        if (d.b === branchName && tipo === currentSector) {
+        if (d.b === branchName && (d.t || 'rodoviario') === currentSector) {
             const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
-            const currentObs = currentRecord ? currentRecord.obs : "";
             let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-            
             historyObj[Date.now() + "_" + (idx++)] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization };
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
+            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentRecord ? currentRecord.obs : "", history: historyObj };
         }
     });
     database.ref().update(updates);
@@ -776,25 +725,19 @@ function approveBranch(branchName) {
 function searchDriver() {
     const term = document.getElementById('indivSearchInput').value.trim().toLowerCase();
     const resDiv = document.getElementById('indivSearchResult');
-    
-    if (!term) { resDiv.style.display = 'none'; document.getElementById('indivPeriodContainer').style.display = 'none'; return; }
+    if (!term) return;
     const found = driverList.find(d => d.c === term || d.n.toLowerCase().includes(term));
-
     resDiv.style.display = 'block';
     if (found) {
         selectedIndivCad = found.c;
-        const tipoStr = found.t === 'fretamento' ? 'Fretamento' : 'Motorista Rodoviário';
-        resDiv.style.background = '#F0FDF4';
-        resDiv.style.color = '#065F46';
-        resDiv.style.borderColor = '#10B981';
-        resDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>Colaborador Localizado:</b><br><span style="font-size: 19px; font-weight:800; display:block; margin:5px 0;">${found.n}</span>Filial: ${found.b} | CAD: ${found.c} | Setor: ${tipoStr}`;
+        resDiv.className = "search-result-box";
+        resDiv.style.background = '#F0FDF4'; resDiv.style.color = '#065F46'; resDiv.style.borderColor = '#10B981';
+        resDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>Colaborador Localizado:</b><br>${found.n} | Filial: ${found.b} | CAD: ${found.c}`;
         renderIndividualPeriod(); 
     } else {
         selectedIndivCad = "";
-        resDiv.style.background = '#FEE2E2';
-        resDiv.style.color = '#991B1B';
-        resDiv.style.borderColor = '#EF4444';
-        resDiv.innerHTML = `<i class="fas fa-times-circle"></i> <b>Não localizado.</b><br>Verifique se o CAD ou o Nome estão corretos.`;
+        resDiv.style.background = '#FEE2E2'; resDiv.style.color = '#991B1B'; resDiv.style.borderColor = '#EF4444';
+        resDiv.innerHTML = `<i class="fas fa-times-circle"></i> <b>Não localizado.</b>`;
         document.getElementById('indivPeriodContainer').style.display = 'none';
     }
 }
@@ -803,19 +746,10 @@ function renderIndividualPeriod() {
     if (!selectedIndivCad) return;
     const startVal = document.getElementById('indivStartDate').value;
     const endVal = document.getElementById('indivEndDate').value;
-
-    if(!startVal || !endVal) {
-        document.getElementById('indivPeriodContainer').style.display = 'none';
-        return;
-    }
-
+    if(!startVal || !endVal) return;
     const start = new Date(startVal + "T12:00:00");
     const end = new Date(endVal + "T12:00:00");
-
-    if(start > end) {
-        document.getElementById('indivPeriodContainer').style.display = 'none';
-        return;
-    }
+    if(start > end) return;
 
     document.getElementById('indivPeriodContainer').style.display = 'block';
     const tbody = document.getElementById('indivPeriodTableBody');
@@ -825,18 +759,16 @@ function renderIndividualPeriod() {
     while (loopDate <= end) {
         const dateKeyStr = loopDate.toISOString().split('T')[0];
         const record = (db[dateKeyStr] && db[dateKeyStr][selectedIndivCad]) ? db[dateKeyStr][selectedIndivCad] : null;
-        
         const status = record ? record.status : "Pendente";
         const obs = record ? record.obs : "";
         const approver = record ? record.approver : "-";
         const time = record ? record.time : "-";
 
         let selectClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : (status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
-        let dataStr = loopDate.toLocaleDateString('pt-BR');
 
         tbody.innerHTML += `
             <tr>
-                <td style="font-weight:700; color:var(--text);">${dataStr}</td>
+                <td style="font-weight:700;">${loopDate.toLocaleDateString('pt-BR')}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <select class="status-select ${selectClass}" onchange="changeStatusDirect('${selectedIndivCad}', '${dateKeyStr}', this.value)">
@@ -849,19 +781,18 @@ function renderIndividualPeriod() {
                     </div>
                 </td>
                 <td>
-                    <input type="text" class="obs-input" placeholder="Justificativa / Motivo..." 
-                    value="${obs}" onblur="saveObs('${selectedIndivCad}', '${dateKeyStr}', this.value)">
+                    <input type="text" class="obs-input" value="${obs}" onblur="saveObs('${selectedIndivCad}', '${dateKeyStr}', this.value)">
                 </td>
                 <td>
-                    <div style="font-weight:700; color:var(--brand); font-size:13px;">${approver}</div>
+                    <div style="font-weight:700; color:var(--brand);">${approver}</div>
                     <div style="font-size:11px; color:var(--text-muted);">${time}</div>
                 </td>
                 <td>
                     <div style="display:flex; gap:5px;">
-                        <button class="btn btn-save btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'OK')" title="Aprovar este dia"><i class="fas fa-check"></i></button>
-                        <button class="btn btn-verify btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Verificado')" title="Verificar este dia"><i class="fas fa-search"></i></button>
-                        <button class="btn btn-reprove btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Erro')" title="Reprovar este dia"><i class="fas fa-times"></i></button>
-                        <button class="btn btn-undo btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Pendente')" title="Voltar Pendente"><i class="fas fa-undo"></i></button>
+                        <button class="btn btn-save btn-small" onclick="changeStatusDirect('${selectedIndivCad}', '${dateKeyStr}', 'OK')"><i class="fas fa-check"></i></button>
+                        <button class="btn btn-verify btn-small" onclick="changeStatusDirect('${selectedIndivCad}', '${dateKeyStr}', 'Verificado')"><i class="fas fa-search"></i></button>
+                        <button class="btn btn-reprove btn-small" onclick="changeStatusDirect('${selectedIndivCad}', '${dateKeyStr}', 'Erro')"><i class="fas fa-times"></i></button>
+                        <button class="btn btn-undo btn-small" onclick="changeStatusDirect('${selectedIndivCad}', '${dateKeyStr}', 'Pendente')"><i class="fas fa-undo"></i></button>
                     </div>
                 </td>
             </tr>
@@ -870,28 +801,14 @@ function renderIndividualPeriod() {
     }
 }
 
-function applyIndividualDayAction(dateKeyStr, statusType) {
-    changeStatusDirect(selectedIndivCad, dateKeyStr, statusType);
-}
-
 function applyIndividualAction(statusType) {
-    const approver = document.getElementById('approverName').value;
-    if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
-    if (!selectedIndivCad) { alert("Busque e selecione um colaborador válido primeiro."); return; }
-
+    if (!currentApprover) { alert("Nome de Aprovador Obrigatório!"); return; }
     const startVal = document.getElementById('indivStartDate').value;
     const endVal = document.getElementById('indivEndDate').value;
-
-    if(!startVal || !endVal) { alert("Defina o período (Data Inicial e Final)!"); return; }
-
+    if(!startVal || !endVal) return;
     const start = new Date(startVal + "T12:00:00");
     const end = new Date(endVal + "T12:00:00");
-
-    if(start > end) { alert("A Data Inicial não pode ser maior que a Final!"); return; }
-
-    let actionName = statusType === 'OK' ? "APROVAR" : (statusType === 'Erro' ? "REPROVAR" : (statusType === 'Verificado' ? "MARCAR COMO VERIFICADO" : "DEIXAR PENDENTE"));
-    if(!confirm(`${actionName} TODO O PERÍODO\n\nTem certeza que deseja aplicar isso para todos os dias selecionados?`)) return;
-
+    
     const timeNow = new Date().toLocaleTimeString('pt-BR');
     const dateRealization = new Date().toLocaleDateString('pt-BR');
     const updates = {};
@@ -900,78 +817,52 @@ function applyIndividualAction(statusType) {
 
     while(loopDate <= end) {
         const dateKey = loopDate.toISOString().split('T')[0];
-        const path = `pontos/${dateKey}/${selectedIndivCad}`;
         const currentRecord = (db[dateKey] && db[dateKey][selectedIndivCad]) ? db[dateKey][selectedIndivCad] : null;
-        const currentObs = currentRecord ? currentRecord.obs : "";
-        
         let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-        historyObj[Date.now() + "_" + (idx++)] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization };
-
-        updates[path] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
+        historyObj[Date.now() + "_" + (idx++)] = { status: statusType, approver: currentApprover, time: timeNow, actionDate: dateRealization };
+        updates[`pontos/${dateKey}/${selectedIndivCad}`] = { status: statusType, approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentRecord ? currentRecord.obs : "", history: historyObj };
         loopDate.setDate(loopDate.getDate() + 1);
     }
-
-    database.ref().update(updates)
-        .then(() => alert(`Operação finalizada com sucesso!`))
-        .catch((err) => alert("Erro: " + err.message));
+    database.ref().update(updates).then(() => alert("Ação aplicada com sucesso!"));
 }
 
-// --- MODAL DE HISTÓRICO JS ---
+// --- MODAL DE HISTÓRICO ---
 function openHistoryModal(cad, dateKeyStr) {
     document.getElementById('historyModal').style.display = 'flex';
     const contentDiv = document.getElementById('historyModalContent');
-    contentDiv.innerHTML = '<p style="color:var(--text-muted); font-size:14px; text-align:center;">Carregando logs...</p>';
-    
     const record = (db[dateKeyStr] && db[dateKeyStr][cad]) ? db[dateKeyStr][cad] : null;
-    if (!record || !record.history || Object.keys(record.history).length === 0) {
-        contentDiv.innerHTML = '<p style="color:var(--text-muted); font-size:14px; text-align:center; padding: 20px;">Nenhum histórico registrado para este ponto ainda.</p>';
+    if (!record || !record.history) {
+        contentDiv.innerHTML = '<p style="text-align:center; padding: 20px; color:var(--text-muted);">Nenhum histórico.</p>';
         return;
     }
-    
-    let html = '<div style="display:flex; flex-direction:column; gap:12px; padding: 5px 0;">';
-    const sortedKeys = Object.keys(record.history).sort((a,b) => b.localeCompare(a)); // Ordem reversa (mais recente no topo)
-    
-    sortedKeys.forEach(key => {
-        const log = record.history[key];
-        let badgeClass = log.status === 'OK' ? 'st-ok' : (log.status === 'Erro' ? 'st-erro' : (log.status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
-        let statusLabel = log.status === 'OK' ? 'Aprovado' : (log.status === 'Erro' ? 'Reprovado' : (log.status === 'Verificado' ? 'Verificado' : 'Pendente'));
-        
+    let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+    Object.keys(record.history).sort((a,b)=>b-a).forEach(k => {
+        const log = record.history[k];
         html += `
-            <div style="background:#F8FAFC; border:1px solid var(--border); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:6px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span class="status-badge ${badgeClass}" style="cursor:default; width:auto; padding:4px 10px; font-size:11px;">${statusLabel}</span>
-                    <span style="font-size:11px; color:var(--text-muted); font-weight:600;">Feito em: ${log.actionDate || '-'} às ${log.time || '-'}</span>
-                </div>
-                <div style="font-size:13px; color:var(--text); font-weight:500;">
-                    <i class="fas fa-user-shield" style="color:var(--brand); margin-right:4px;"></i> Por: <b>${log.approver}</b>
-                </div>
-            </div>
-        `;
+            <div style="background:#F8FAFC; border:1px solid var(--border); padding:10px; border-radius:8px;">
+                <span class="status-badge st-${log.status==='OK'?'ok':(log.status==='Erro'?'erro':(log.status==='Verificado'?'verificado':'pendente'))}" style="font-size:10px; padding:2px 8px;">${log.status}</span>
+                <span style="font-size:11px; float:right; color:var(--text-muted);">${log.actionDate} ${log.time}</span>
+                <div style="margin-top:5px; font-size:12px;">Por: <b>${log.approver}</b></div>
+            </div>`;
     });
-    html += '</div>';
-    contentDiv.innerHTML = html;
+    contentDiv.innerHTML = html + '</div>';
 }
-
-function closeHistoryModal() {
-    document.getElementById('historyModal').style.display = 'none';
-}
-
+function closeHistoryModal() { document.getElementById('historyModal').style.display = 'none'; }
 
 // ==========================================
-// --- NOVO MÓDULO: TRATATIVA DE ESCALA ---
+// --- MÓDULO SOLICITAÇÃO DE ESCALA ---
 // ==========================================
+function setEscalaFilter(filter) {
+    currentEscalaFilter = filter;
+    document.getElementById('escTabPendentes').classList.toggle('active', filter === 'pendentes');
+    document.getElementById('escTabConcluidos').classList.toggle('active', filter === 'concluidos');
+    renderEscalaTable();
+}
 
 function autoFillEscalaName() {
     const cad = document.getElementById('escCad').value.trim();
-    const nomeInput = document.getElementById('escNome');
-    if(!cad) { nomeInput.value = ""; return; }
-    
     const found = driverList.find(d => d.c === cad);
-    if(found) {
-        nomeInput.value = found.n;
-    } else {
-        nomeInput.value = "CAD Não Encontrado na Base";
-    }
+    document.getElementById('escNome').value = found ? found.n : "CAD Não Encontrado na Base";
 }
 
 function abrirSolicitacaoEscala() {
@@ -981,334 +872,202 @@ function abrirSolicitacaoEscala() {
     const dataRef = document.getElementById('escDataRef').value;
     const solicitante = document.getElementById('escSolicitante').value;
 
-    if(!cad || !dataRef || !solicitante) {
-        alert("Preencha o CAD, a Data e informe quem está Solicitando!");
-        return;
-    }
-    if(nome === "CAD Não Encontrado na Base") {
-        alert("Utilize um CAD válido cadastrado na base.");
-        return;
-    }
+    if(!cad || !dataRef || !solicitante || nome === "CAD Não Encontrado na Base") { alert("Dados incompletos ou CAD inválido!"); return; }
 
-    const idUnico = "ESC_" + Date.now();
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateNow = new Date().toLocaleDateString('pt-BR');
-
-    const novoPedido = {
-        cad: cad,
-        nome: nome,
-        tipo: tipo,
-        dataRef: dataRef,
-        solicitante: solicitante,
-        status: "Pendente",
-        dataAbertura: `${dateNow} ${timeNow}`
-    };
-
-    escalaRef.child(idUnico).set(novoPedido)
-        .then(() => {
-            alert("Solicitação enviada aos escaladores com sucesso!");
-            document.getElementById('escCad').value = "";
-            document.getElementById('escNome').value = "";
-        });
+    const id = "ESC_" + Date.now();
+    escalaRef.child(id).set({
+        cad: cad, nome: nome, tipo: tipo, dataRef: dataRef, solicitante: solicitante,
+        status: "Pendente", dataAbertura: `${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`
+    }).then(() => {
+        alert("Solicitado!"); document.getElementById('escCad').value = ""; document.getElementById('escNome').value = "";
+    });
 }
 
 function renderEscalaTable() {
     const tbody = document.getElementById('tabelaEscalaBody');
-    if(!tbody) return;
-    tbody.innerHTML = "";
+    if(!tbody) return; tbody.innerHTML = "";
 
-    const keys = Object.keys(escalaData).sort((a,b) => b.localeCompare(a)); // mais novos primeiro
-
-    keys.forEach(k => {
+    Object.keys(escalaData).sort((a,b)=>b.localeCompare(a)).forEach(k => {
         const item = escalaData[k];
-        
-        let statusClass = "st-pendente";
-        if(item.status === "Respondido") statusClass = "st-verificado";
-        if(item.status === "Feito") statusClass = "st-ok";
+        if (currentEscalaFilter === 'pendentes' && item.status === 'Feito') return;
+        if (currentEscalaFilter === 'concluidos' && item.status !== 'Feito') return;
 
-        let tdHorarios = "<span style='color:var(--text-muted); font-size:12px;'>Aguardando Preenchimento</span>";
-        if(item.status !== "Pendente" && item.horarios) {
-            tdHorarios = `
-                <div style="font-size:11px; line-height:1.4;">
-                    <b>E:</b> ${item.horarios.entrada || '--:--'} | <b>S:</b> ${item.horarios.saida || '--:--'}<br>
-                    <b>I1:</b> ${item.horarios.int1Ini || '--:--'} às ${item.horarios.int1Fim || '--:--'}<br>
-                    <b>I2:</b> ${item.horarios.int2Ini || '--:--'} às ${item.horarios.int2Fim || '--:--'}
-                </div>
-            `;
-        }
+        let statusClass = item.status === 'Feito' ? 'st-ok' : (item.status === 'Respondido' ? 'st-verificado' : 'st-pendente');
+        let tdHorarios = item.horarios ? `
+            <div style="font-size:11px; line-height:1.3;">
+                <b>E:</b> ${item.horarios.entrada} | <b>S:</b> ${item.horarios.saida}<br>
+                <b>I1:</b> ${item.horarios.int1Ini || '--'} às ${item.horarios.int1Fim || '--'}<br>
+                ${item.horarios.int2Ini ? `<b>I2:</b> ${item.horarios.int2Ini} às ${item.horarios.int2Fim}` : ''}
+            </div>` : "<span style='color:var(--text-muted); font-size:12px;'>Aguardando Escalador</span>";
 
-        let acoesHtml = "";
-        if(item.status === "Pendente") {
-            acoesHtml = `<button class="btn btn-manage btn-small" onclick="openResponderEscala('${k}')" style="width:100%; justify-content:center;"><i class="fas fa-edit"></i> Escalador: Preencher</button>`;
-        } else if (item.status === "Respondido") {
-            acoesHtml = `<button class="btn btn-save btn-small" onclick="marcarEscalaFeito('${k}')" style="width:100%; justify-content:center;"><i class="fas fa-check-double"></i> Lançar Oitchau (Feito)</button>`;
-        } else {
-            acoesHtml = `<div style="text-align:center; font-weight:700; color:var(--brand); font-size:12px;">Finalizado por:<br>${item.finalizador}</div>`;
-        }
-
-        let dataFormatada = "";
-        if(item.dataRef) {
-            const pt = item.dataRef.split('-');
-            if(pt.length===3) dataFormatada = `${pt[2]}/${pt[1]}/${pt[0]}`;
-        }
+        let acoes = item.status === 'Pendente' ? `
+            <button class="btn btn-manage btn-small" onclick="openResponderEscala('${k}')"><i class="fas fa-edit"></i> Responder</button>
+            <button class="btn btn-reprove btn-small" onclick="excluirEscala('${k}')" style="margin-top:4px;"><i class="fas fa-trash"></i> Apagar</button>` : 
+            (item.status === 'Respondido' ? `
+            <button class="btn btn-save btn-small" onclick="marcarEscalaFeito('${k}')"><i class="fas fa-check"></i> Finalizar</button>
+            <button class="btn btn-undo btn-small" onclick="openResponderEscala('${k}')" style="margin-top:4px; background:#64748B;"><i class="fas fa-pencil-alt"></i> Editar</button>
+            <button class="btn btn-reprove btn-small" onclick="excluirEscala('${k}')" style="margin-top:4px;"><i class="fas fa-trash"></i> Apagar</button>` : 
+            `<span style='font-size:12px; font-weight:700; color:var(--brand);'>Finalizado por:<br>${item.finalizador}</span>`);
 
         tbody.innerHTML += `
             <tr>
-                <td style="font-weight:700;">${dataFormatada}</td>
-                <td>
-                    <b>${item.cad}</b><br>
-                    <span style="font-size:12px; color:var(--text-muted);">${item.nome}</span>
-                </td>
+                <td>${item.dataRef.split('-').reverse().join('/')}</td>
+                <td><b>${item.cad}</b><br><small>${item.nome}</small></td>
                 <td>${item.tipo}</td>
                 <td>${item.solicitante}</td>
                 <td>${tdHorarios}</td>
-                <td style="font-weight:700; color:#3B82F6;">${item.escalador || '-'}</td>
-                <td>
-                    <div style="display:flex; flex-direction:column; gap:8px;">
-                        <span class="status-badge ${statusClass}" style="width:100%; font-size:11px; padding:5px;">${item.status}</span>
-                        ${acoesHtml}
-                    </div>
-                </td>
-            </tr>
-        `;
+                <td><b>${item.escalador || '-'}</b></td>
+                <td><div style="display:flex; flex-direction:column; gap:4px;"><span class="status-badge ${statusClass}" style="width:100%; box-sizing:border-box;">${item.status}</span>${acoes}</div></td>
+            </tr>`;
     });
-
-    if(keys.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhuma solicitação de escala registrada.</td></tr>`;
-    }
 }
+
+function excluirEscala(id) { if(confirm('Apagar permanentemente este pedido?')) escalaRef.child(id).remove(); }
 
 function openResponderEscala(id) {
     const item = escalaData[id];
-    if(!item) return;
-
-    let dataFormatada = "";
-    if(item.dataRef) {
-        const pt = item.dataRef.split('-');
-        if(pt.length===3) dataFormatada = `${pt[2]}/${pt[1]}/${pt[0]}`;
-    }
-
     document.getElementById('respEscalaId').value = id;
-    document.getElementById('respEscalaInfo').innerHTML = `<b>Motorista:</b> ${item.nome} (CAD: ${item.cad})<br><b>Data sem Ponto:</b> ${dataFormatada}`;
-    
-    // Limpar campos
-    document.getElementById('respEscalaNome').value = "";
-    document.getElementById('respEntrada').value = "";
-    document.getElementById('respSaida').value = "";
-    document.getElementById('respInt1Ini').value = "";
-    document.getElementById('respInt1Fim').value = "";
-    document.getElementById('respInt2Ini').value = "";
-    document.getElementById('respInt2Fim').value = "";
-
+    document.getElementById('respEscalaInfo').innerHTML = `<b>Motorista:</b> ${item.nome} | <b>Data:</b> ${item.dataRef.split('-').reverse().join('/')}`;
+    document.getElementById('respEscalaNome').value = item.escalador || "";
+    document.getElementById('respEntrada').value = item.horarios ? item.horarios.entrada : "";
+    document.getElementById('respSaida').value = item.horarios ? item.horarios.saida : "";
+    document.getElementById('respInt1Ini').value = item.horarios ? item.horarios.int1Ini : "";
+    document.getElementById('respInt1Fim').value = item.horarios ? item.horarios.int1Fim : "";
+    document.getElementById('respInt2Ini').value = item.horarios ? item.horarios.int2Ini : "";
+    document.getElementById('respInt2Fim').value = item.horarios ? item.horarios.int2Fim : "";
     document.getElementById('escalaRespModal').style.display = 'flex';
 }
-
-function closeEscalaModal() {
-    document.getElementById('escalaRespModal').style.display = 'none';
-}
+function closeEscalaModal() { document.getElementById('escalaRespModal').style.display = 'none'; }
 
 function salvarRespostaEscala() {
     const id = document.getElementById('respEscalaId').value;
-    const escalador = document.getElementById('respEscalaNome').value;
-
-    if(!escalador) {
-        alert("Escalador, por favor selecione o seu nome!");
-        return;
-    }
-
-    const hEntrada = document.getElementById('respEntrada').value;
-    const hSaida = document.getElementById('respSaida').value;
-    
-    if(!hEntrada || !hSaida) {
-        alert("Preencha ao menos a Entrada e a Saída!");
-        return;
-    }
-
-    const hor = {
-        entrada: hEntrada,
-        saida: hSaida,
-        int1Ini: document.getElementById('respInt1Ini').value,
-        int1Fim: document.getElementById('respInt1Fim').value,
-        int2Ini: document.getElementById('respInt2Ini').value,
-        int2Fim: document.getElementById('respInt2Fim').value
-    };
-
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateNow = new Date().toLocaleDateString('pt-BR');
+    const esc = document.getElementById('respEscalaNome').value;
+    if(!esc || !document.getElementById('respEntrada').value || !document.getElementById('respSaida').value) { alert("Informe seu nome, Entrada e Saída!"); return; }
 
     escalaRef.child(id).update({
-        status: "Respondido",
-        escalador: escalador,
-        dataResposta: `${dateNow} ${timeNow}`,
-        horarios: hor
-    }).then(() => {
-        closeEscalaModal();
-    });
+        status: "Respondido", escalador: esc,
+        dataResposta: `${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`,
+        horarios: {
+            entrada: document.getElementById('respEntrada').value, saida: document.getElementById('respSaida').value,
+            int1Ini: document.getElementById('respInt1Ini').value, int1Fim: document.getElementById('respInt1Fim').value,
+            int2Ini: document.getElementById('respInt2Ini').value, int2Fim: document.getElementById('respInt2Fim').value
+        }
+    }).then(() => closeEscalaModal());
 }
 
 function marcarEscalaFeito(id) {
-    const adminFinalizador = document.getElementById('approverName').value;
-    if(!adminFinalizador) {
-        alert("Insira seu nome lá no topo da tela antes de Lançar como Feito!");
-        return;
+    if(!currentApprover) { alert("Insira seu nome no topo!"); return; }
+    escalaRef.child(id).update({ status: "Feito", finalizador: currentApprover, dataFeito: `${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}` });
+}
+
+// ==========================================
+// --- MÓDULO PRODUTIVIDADE DE HOJE ---
+// ==========================================
+function renderRelatorioDia() {
+    const tbody = document.getElementById('tabelaRelatorioDiaBody');
+    tbody.innerHTML = ""; dadosRelatorioHoje = [];
+    let ok = 0, ver = 0, err = 0;
+    const tBR = new Date().toLocaleDateString('pt-BR');
+
+    for (const dKey in db) {
+        for (const cad in db[dKey]) {
+            const rec = db[dKey][cad];
+            if (rec.actionDate === tBR && ['OK','Verificado','Erro'].includes(rec.status)) {
+                const dv = driverList.find(d => d.c === cad);
+                dadosRelatorioHoje.push({ dataRef: dKey, cad: cad, nome: dv ? dv.n : "Desconhecido", status: rec.status, approver: rec.approver, time: rec.time });
+                if(rec.status === 'OK') ok++; if(rec.status === 'Verificado') ver++; if(rec.status === 'Erro') err++;
+            }
+        }
     }
+    document.getElementById('rel-aprovados').innerText = ok;
+    document.getElementById('rel-verificados').innerText = ver;
+    document.getElementById('rel-reprovados').innerText = err;
 
-    if(!confirm("Tem certeza que já lançou esses horários no sistema oficial? Lançar como FEITO?")) return;
-
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateNow = new Date().toLocaleDateString('pt-BR');
-
-    escalaRef.child(id).update({
-        status: "Feito",
-        finalizador: adminFinalizador,
-        dataFeito: `${dateNow} ${timeNow}`
+    dadosRelatorioHoje.sort((a,b)=>b.time.localeCompare(a.time)).forEach(item => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${item.dataRef.split('-').reverse().join('/')}</td>
+                <td><b>${item.cad}</b></td>
+                <td>${item.nome}</td>
+                <td><span class="status-badge st-${item.status==='OK'?'ok':(item.status==='Erro'?'erro':'verificado')}">${item.status==='OK'?'Aprovado':(item.status==='Erro'?'Reprovado':'Verificado')}</span></td>
+                <td><b>${item.approver}</b></td>
+                <td>Hoje às ${item.time}</td>
+            </tr>`;
     });
 }
 
-
-// --- GESTÃO DE BASE DE COLABORADORES ---
-function openManageModal() {
-    document.getElementById('manageModal').style.display = 'flex';
-    renderBranchOptions('branchList');
-    renderManageList();
-}
-function closeManageModal() { document.getElementById('manageModal').style.display = 'none'; }
-
-function renderBranchOptions(elemId) {
-    const branches = [...new Set(driverList.map(d => d.b))].sort();
-    const dataList = document.getElementById(elemId);
-    dataList.innerHTML = '';
-    branches.forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b; dataList.appendChild(opt);
-    });
+function exportarRelatorioDia() {
+    let csv = "\ufeffData Referencia;CAD;Nome;Status Aplicado;Responsavel;Hora\n";
+    dadosRelatorioHoje.forEach(i => { csv += `${i.dataRef.split('-').reverse().join('/')};${i.cad};${i.nome};${i.status};${i.approver};${i.time}\n`; });
+    downloadCSV(csv, `Produtividade_Hoje_${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.csv`);
 }
 
-function addDriver() {
-    const cad = document.getElementById('newCad').value.trim();
-    const branch = document.getElementById('newBranch').value.trim();
-    const name = document.getElementById('newName').value.trim();
-    const sector = document.getElementById('newSector').value;
-
-    if (!cad || !branch || !name) { alert("Preencha todos os campos!"); return; }
-    if (driverList.find(d => d.c === cad)) { alert("Esse CAD já está em uso na base!"); return; }
-    
-    const newList = [...driverList, { b: branch, c: cad, n: name, t: sector }];
-    driversRef.set(newList);
-    
-    document.getElementById('newCad').value = ""; document.getElementById('newName').value = "";
-    alert("Colaborador salvo com sucesso!");
-}
-
-function removeDriver(cad) {
-    if (!confirm("Tem certeza que deseja apagar este colaborador da base de dados?")) return;
-    const newList = driverList.filter(d => d.c !== cad);
-    driversRef.set(newList);
-}
-
-function renderManageList() {
-    const listContainer = document.getElementById('manageListContainer');
-    listContainer.innerHTML = "";
-    driverList.forEach(d => {
-        const tipoTag = d.t === 'fretamento' ? '<span style="background:#FBAF17; color:#000; padding:3px 6px; border-radius:4px; font-size:10px; margin-left:8px; font-weight:700;">Fretamento</span>' : '<span style="background:#006B3F; color:#fff; padding:3px 6px; border-radius:4px; font-size:10px; margin-left:8px; font-weight:700;">Rodoviário</span>';
-        const item = document.createElement('div');
-        item.className = 'manage-item';
-        item.innerHTML = `<span><b style="color:var(--brand)">${d.b}</b> - ${d.n} <small style="color:var(--text-muted)">(CAD: ${d.c})</small> ${tipoTag}</span> <button class="btn-del" onclick="removeDriver('${d.c}')"><i class="fas fa-trash"></i> Excluir</button>`;
-        listContainer.appendChild(item);
-    });
-}
-
-
-// --- EXPORTAR EXCEL (PONTOS NORMAIS E ESCALA) ---
+// --- OUTRAS EXPORTAÇÕES EXCEL E MODAL BASE ---
 function downloadCSV(content, fileName) {
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = fileName;
-    link.click();
+    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = fileName; link.click();
 }
 
 function exportDay() {
-    sortDriverList();
-    let csv = "\ufeffFilial;Setor;CAD;Nome;Data Referencia;Status;Observacao;Aprovador;Hora Acao;Data Execucao\n";
-    const dayData = db[currentDateKey] || {};
-    
+    let csv = "\ufeffFilial;Setor;CAD;Nome;Data Ponto;Status;Observacao;Responsavel;Hora;Data Execucao\n";
     driverList.forEach(d => {
-        const rec = dayData[d.c];
-        const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : (rec.status === 'Verificado' ? 'Verificado' : 'Pendente'))) : "Pendente";
-        const obs = rec ? rec.obs : "";
-        const app = rec ? rec.approver : "";
-        const time = rec ? rec.time : "";
-        const actD = rec ? (rec.actionDate || currentDateKey) : "";
-        const tipo = d.t === 'fretamento' ? 'Fretamento' : 'Rodoviario';
-        
-        csv += `${d.b};${tipo};${d.c};${d.n};${currentDateKey};${st};${obs};${app};${time};${actD}\n`;
+        const rec = (db[currentDateKey] || {})[d.c];
+        const st = rec ? (rec.status==='OK'?'Aprovado':(rec.status==='Erro'?'Reprovado':(rec.status==='Verificado'?'Verificado':'Pendente'))) : "Pendente";
+        csv += `${d.b};${d.t==='fretamento'?'Fretamento':'Rodoviario'};${d.c};${d.n};${currentDateKey};${st};${rec?rec.obs:''};${rec?rec.approver:''};${rec?rec.time:''};${rec?rec.actionDate:''}\n`;
     });
-    downloadCSV(csv, `ExpressoNordeste_PontoDia_${currentDateKey}.csv`);
-}
-
-function getPeriodLimits(dateStr) {
-    const current = new Date(dateStr + "T12:00:00");
-    const day = current.getDate();
-    const month = current.getMonth(); 
-    const year = current.getFullYear();
-    let start, end;
-    if (day >= 11) { start = new Date(year, month, 11); end = new Date(year, month + 1, 10); }
-    else { start = new Date(year, month - 1, 11); end = new Date(year, month, 10); }
-    return { start, end };
+    downloadCSV(csv, `ExpressoNordeste_Dia_${currentDateKey}.csv`);
 }
 
 function exportDetailedReport() {
-    sortDriverList();
     const limits = getPeriodLimits(currentDateKey);
-    let csv = "\ufeffFilial;Setor;CAD;Nome;Data do Ponto;Status;Observacao;Aprovador;Hora Acao;Data Execucao\n";
-    
-    let loopDate = new Date(limits.start);
-    while (loopDate <= limits.end) {
-        const dateKey = loopDate.toISOString().split('T')[0];
-        const dayData = db[dateKey] || {};
-        
+    let csv = "\ufeffFilial;Setor;CAD;Nome;Data Ponto;Status;Observacao;Responsavel;Hora;Data Execucao\n";
+    let loop = new Date(limits.start);
+    while (loop <= limits.end) {
+        const dKey = loop.toISOString().split('T')[0];
         driverList.forEach(d => {
-            const rec = dayData[d.c];
-            const st = rec ? (rec.status === 'OK' ? 'Aprovado' : (rec.status === 'Erro' ? 'Reprovado' : (rec.status === 'Verificado' ? 'Verificado' : 'Pendente'))) : "Pendente";
-            const obs = rec ? rec.obs : "";
-            const app = rec ? rec.approver : "";
-            const time = rec ? rec.time : "";
-            const actD = rec ? (rec.actionDate || loopDate.toLocaleDateString('pt-BR')) : "";
-            const tipo = d.t === 'fretamento' ? 'Fretamento' : 'Rodoviario';
-            const dataFormatada = loopDate.toLocaleDateString('pt-BR');
-            
-            csv += `${d.b};${tipo};${d.c};${d.n};${dataFormatada};${st};${obs};${app};${time};${actD}\n`;
+            const rec = (db[dKey] || {})[d.c];
+            const st = rec ? (rec.status==='OK'?'Aprovado':(rec.status==='Erro'?'Reprovado':(rec.status==='Verificado'?'Verificado':'Pendente'))) : "Pendente";
+            csv += `${d.b};${d.t==='fretamento'?'Fretamento':'Rodoviario'};${d.c};${d.n};${loop.toLocaleDateString('pt-BR')};${st};${rec?rec.obs:''};${rec?rec.approver:''};${rec?rec.time:''};${rec?rec.actionDate:''}\n`;
         });
-        loopDate.setDate(loopDate.getDate() + 1);
+        loop.setDate(loop.getDate() + 1);
     }
-    
-    const fileName = `ExpressoNordeste_RelatorioDetalhado_${limits.start.toLocaleDateString('pt-BR').replace(/\//g,'-')}_a_${limits.end.toLocaleDateString('pt-BR').replace(/\//g,'-')}.csv`;
-    downloadCSV(csv, fileName);
+    downloadCSV(csv, `Relatorio_Periodo.csv`);
 }
 
-// Planilha Exclusiva das Tratativas de Escala
 function exportarEscalaExcel() {
-    let csv = "\ufeffData Referencia;CAD;Motorista;Categoria;Status Atual;Solicitante;Abertura;Escalador Responsavel;Data Resposta;Horario Informado;Lançado Por (Finalizador);Data Lançado\n";
-    
-    const keys = Object.keys(escalaData).sort((a,b) => b.localeCompare(a));
-    
-    keys.forEach(k => {
-        const item = escalaData[k];
-        
-        let dataFormatada = "";
-        if(item.dataRef) {
-            const pt = item.dataRef.split('-');
-            if(pt.length===3) dataFormatada = `${pt[2]}/${pt[1]}/${pt[0]}`;
-        }
-
-        let strHorarios = "Pendente";
-        if (item.horarios) {
-            strHorarios = `Ent:${item.horarios.entrada || ''} / I1:${item.horarios.int1Ini || ''}-${item.horarios.int1Fim || ''} / I2:${item.horarios.int2Ini || ''}-${item.horarios.int2Fim || ''} / Sai:${item.horarios.saida || ''}`;
-        }
-
-        csv += `${dataFormatada};${item.cad};${item.nome};${item.tipo};${item.status};${item.solicitante};${item.dataAbertura || ''};${item.escalador || ''};${item.dataResposta || ''};${strHorarios};${item.finalizador || ''};${item.dataFeito || ''}\n`;
+    let csv = "\ufeffData Ponto;CAD;Motorista;Categoria;Status;Solicitante;Abertura;Escalador;Horarios;Finalizador;Data Conclusao\n";
+    Object.keys(escalaData).forEach(k => {
+        const i = escalaData[k];
+        let hrs = i.horarios ? `E:${i.horarios.entrada} S:${i.horarios.saida}` : 'Pendente';
+        csv += `${i.dataRef.split('-').reverse().join('/')};${i.cad};${i.nome};${i.tipo};${i.status};${i.solicitante};${i.dataAbertura || ''};${i.escalador || ''};${hrs};${i.finalizador || ''};${i.dataFeito || ''}\n`;
     });
-
-    downloadCSV(csv, `ExpressoNordeste_Historico_Escalas.csv`);
+    downloadCSV(csv, `Historico_Escalas.csv`);
 }
+
+function openManageModal() { document.getElementById('manageModal').style.display = 'flex'; renderBranchOptions('branchList'); renderManageList(); }
+function closeManageModal() { document.getElementById('manageModal').style.display = 'none'; }
+function renderBranchOptions(id) {
+    const b = [...new Set(driverList.map(d => d.b))].sort();
+    const dl = document.getElementById(id); dl.innerHTML = '';
+    b.forEach(x => { const o = document.createElement('option'); o.value = x; dl.appendChild(o); });
+}
+function addDriver() {
+    const c = document.getElementById('newCad').value.trim(); const b = document.getElementById('newBranch').value.trim(); const n = document.getElementById('newName').value.trim(); const s = document.getElementById('newSector').value;
+    if(!c || !b || !n || driverList.find(x => x.c === c)) { alert("Erro de validação!"); return; }
+    driversRef.set([...driverList, { b: b, c: c, n: n, t: s }]);
+    document.getElementById('newCad').value = ""; document.getElementById('newName').value = "";
+}
+function removeDriver(c) { if(confirm('Apagar motorista?')) driversRef.set(driverList.filter(x => x.c !== c)); }
+function renderManageList() {
+    const list = document.getElementById('manageListContainer'); list.innerHTML = "";
+    driverList.forEach(d => {
+        const div = document.createElement('div'); div.className = 'manage-item';
+        div.innerHTML = `<span><b>${d.b}</b> - ${d.n} (${d.c})</span> <button class="btn-del" onclick="removeDriver('${d.c}')">Apagar</button>`;
+        list.appendChild(div);
+    });
+}
+function getPeriodLimits(dStr) {
+    const cur = new Date(dStr + "T12:00:00"); const d = cur.getDate(); const m = cur.getMonth(); const y = cur.getFullYear();
+    return d >= 11 ? { start: new Date(y, m, 11), end: new Date(y, m + 1, 10) } : { start: new Date(y, m - 1, 11), end: new Date(y, m, 10) };
+}
+let dadosRelatorioHoje = [];
