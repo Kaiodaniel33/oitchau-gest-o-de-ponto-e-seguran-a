@@ -41,8 +41,8 @@
             </div>
 
             <div class="control-group">
-                <label>Aprovador Atual</label>
-                <input type="text" id="approverName" placeholder="Seu nome (Ex: Kaio)" onchange="saveConfig()">
+                <label>Seu Nome (Aprovador Oficial)</label>
+                <input type="text" id="approverName" placeholder="Ex: Kaio, Bruna..." onchange="saveConfig()">
             </div>
 
             <div class="control-group" style="flex: 1;">
@@ -52,10 +52,10 @@
                         <i class="fas fa-users-cog"></i> Gerenciar Base
                     </button>
                     <button class="btn btn-excel-day" onclick="exportDay()">
-                        <i class="fas fa-file-excel"></i> Relatório do Dia
+                        <i class="fas fa-file-excel"></i> Relatório Dia
                     </button>
                     <button class="btn btn-excel-period" onclick="exportDetailedReport()">
-                        <i class="fas fa-table"></i> Relatório do Período
+                        <i class="fas fa-table"></i> Relatório Período
                     </button>
                     <button class="btn btn-reprove" onclick="sairSistema()" style="margin-left: 10px;">
                         <i class="fas fa-sign-out-alt"></i> Sair
@@ -65,10 +65,12 @@
         </div>
 
         <div class="main-tabs">
-            <button class="main-tab active" id="tab-dia" onclick="switchMainTab('dia')"><i class="fas fa-calendar-day"></i> Visão Geral por Dia / Setor</button>
-            <button class="main-tab" id="tab-individual" onclick="switchMainTab('individual')"><i class="fas fa-user-clock"></i> Visão Individual Detalhada</button>
+            <button class="main-tab active" id="tab-dia" onclick="switchMainTab('dia')"><i class="fas fa-calendar-day"></i> Ponto Diário</button>
+            <button class="main-tab" id="tab-individual" onclick="switchMainTab('individual')"><i class="fas fa-user-clock"></i> Ponto Individual</button>
+            <button class="main-tab" id="tab-escala" onclick="switchMainTab('escala')"><i class="fas fa-clipboard-list"></i> Solicitação de Horários (Escala)</button>
         </div>
 
+        <!-- ABA: VISÃO DIÁRIA -->
         <div id="view-dia" class="view-section active">
             
             <div class="sector-tabs">
@@ -82,8 +84,9 @@
                     <input type="date" id="datePicker" onchange="loadDate()">
                 </div>
                 <div class="action-buttons-group">
-                    <button class="btn btn-save" onclick="approveAllDaily()"><i class="fas fa-check-double"></i> Aprovar Dia Todo</button>
-                    <button class="btn btn-reprove" onclick="reproveAllDaily()"><i class="fas fa-times-circle"></i> Reprovar Dia Todo</button>
+                    <button class="btn btn-save" onclick="approveAllDaily()"><i class="fas fa-check-double"></i> Aprovar Dia</button>
+                    <button class="btn btn-verify" onclick="verifyAllDaily()"><i class="fas fa-search"></i> Verificar Dia</button>
+                    <button class="btn btn-reprove" onclick="reproveAllDaily()"><i class="fas fa-times-circle"></i> Reprovar Dia</button>
                     <button class="btn btn-undo" onclick="cancelAllDaily()"><i class="fas fa-eraser"></i> Limpar Dia</button>
                 </div>
             </div>
@@ -91,7 +94,7 @@
             <div class="summary-bar">
                 <div class="card card-ok">
                     <div class="card-icon"><i class="fas fa-check-circle"></i></div>
-                    <div class="card-info"><h3 id="count-ok">0</h3><span>Aprovados / Verif.</span></div>
+                    <div class="card-info"><h3 id="count-ok">0</h3><span>Aprovados / Verificados</span></div>
                 </div>
                 <div class="card card-pending">
                     <div class="card-icon"><i class="fas fa-clock"></i></div>
@@ -106,9 +109,9 @@
             <div id="tableContainer"></div>
         </div>
 
+        <!-- ABA: VISÃO INDIVIDUAL -->
         <div id="view-individual" class="view-section">
             <div class="individual-panel">
-                
                 <div class="indiv-top-section">
                     <div class="indiv-search-area">
                         <label>1. Buscar Colaborador (CAD ou Nome):</label>
@@ -131,6 +134,7 @@
                             <label>3. Ação Rápida no Período Inteiro:</label>
                             <div class="individual-actions">
                                 <button class="btn btn-save" onclick="applyIndividualAction('OK')"><i class="fas fa-check-double"></i> Aprovar Tudo</button>
+                                <button class="btn btn-verify" onclick="applyIndividualAction('Verificado')"><i class="fas fa-search"></i> Verificar Tudo</button>
                                 <button class="btn btn-reprove" onclick="applyIndividualAction('Erro')"><i class="fas fa-times-circle"></i> Reprovar Tudo</button>
                                 <button class="btn btn-undo" onclick="applyIndividualAction('Pendente')"><i class="fas fa-eraser"></i> Limpar Tudo</button>
                             </div>
@@ -146,7 +150,7 @@
                                 <th width="15%">Data Ref.</th>
                                 <th width="20%">Status Atual</th>
                                 <th width="25%">Observação / Justificativa</th>
-                                <th width="20%">Último Aprovador</th>
+                                <th width="20%">Último Ação</th>
                                 <th width="20%">Ação Individual</th>
                             </tr>
                         </thead>
@@ -154,11 +158,82 @@
                         </tbody>
                     </table>
                 </div>
-
             </div>
         </div>
+
+        <!-- ABA: SOLICITAÇÃO DE ESCALAS -->
+        <div id="view-escala" class="view-section">
+            <div class="individual-panel">
+                
+                <!-- Formulário de Nova Solicitação -->
+                <div style="background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+                    <h3 style="margin-top:0; color:var(--brand); display:flex; align-items:center; gap:10px;"><i class="fas fa-bullhorn"></i> Abrir Solicitação de Horário para Escalador</h3>
+                    
+                    <div class="add-form" style="grid-template-columns: 1fr 2fr 1fr 1fr; margin-bottom:0; border-bottom:none; padding-bottom:0;">
+                        <div class="input-wrap">
+                            <label>CAD do Colaborador</label>
+                            <input type="text" id="escCad" placeholder="Ex: 21001" onblur="autoFillEscalaName()">
+                        </div>
+                        <div class="input-wrap">
+                            <label>Nome Automático</label>
+                            <input type="text" id="escNome" readonly style="background:#E2E8F0; cursor:not-allowed;">
+                        </div>
+                        <div class="input-wrap">
+                            <label>Categoria</label>
+                            <select id="escTipo">
+                                <option value="Reserva">Reserva</option>
+                                <option value="Rodoviário">Rodoviário</option>
+                                <option value="Fretamento">Fretamento</option>
+                            </select>
+                        </div>
+                        <div class="input-wrap">
+                            <label>Data do Ponto Sem Escala</label>
+                            <input type="date" id="escDataRef">
+                        </div>
+                        <div class="input-wrap full-width" style="grid-column: span 3;">
+                            <label>Quem está solicitando? (Equipe Administrativa)</label>
+                            <select id="escSolicitante">
+                                <option value="">Selecione seu nome...</option>
+                                <option value="Kaio">Kaio</option>
+                                <option value="Bruna">Bruna</option>
+                                <option value="Tainá">Tainá</option>
+                                <option value="Paloma">Paloma</option>
+                            </select>
+                        </div>
+                        <div class="input-wrap" style="justify-content: flex-end;">
+                            <button class="btn btn-manage" onclick="abrirSolicitacaoEscala()" style="width:100%; justify-content:center;"><i class="fas fa-paper-plane"></i> Enviar Pedido</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Painel/Grid de Escalas -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                    <h3 style="margin:0;"><i class="fas fa-list-ul"></i> Painel de Ajustes de Escala</h3>
+                    <button class="btn btn-excel-period" onclick="exportarEscalaExcel()"><i class="fas fa-file-excel"></i> Exportar Planilha de Escala</button>
+                </div>
+                
+                <table class="modern-table">
+                    <thead>
+                        <tr>
+                            <th width="10%">Data Ponto</th>
+                            <th width="20%">Motorista</th>
+                            <th width="10%">Categoria</th>
+                            <th width="10%">Solicitante</th>
+                            <th width="20%">Horários Determinados</th>
+                            <th width="15%">Escalador Responsável</th>
+                            <th width="15%">Status / Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaEscalaBody">
+                        <!-- Gerado via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
+    <!-- Modal Gerenciar Base -->
     <div class="modal-overlay" id="manageModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -192,14 +267,63 @@
         </div>
     </div>
 
+    <!-- Modal Histórico de Aprovações de Ponto -->
     <div class="modal-overlay" id="historyModal">
         <div class="modal-content" style="width: 500px;">
             <div class="modal-header">
-                <h2><i class="fas fa-history"></i> Histórico de Alterações</h2>
+                <h2><i class="fas fa-history"></i> Histórico do Ponto</h2>
                 <span class="close-btn" onclick="closeHistoryModal()">✕</span>
             </div>
-            <div id="historyModalContent" style="overflow-y: auto; flex: 1; padding-right: 5px;">
+            <div id="historyModalContent" style="overflow-y: auto; flex: 1; padding-right: 5px;"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Resposta do Escalador -->
+    <div class="modal-overlay" id="escalaRespModal">
+        <div class="modal-content" style="width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Definir Horários (Escalador)</h2>
+                <span class="close-btn" onclick="closeEscalaModal()">✕</span>
+            </div>
+            <input type="hidden" id="respEscalaId">
+            <div style="margin-bottom: 20px; font-size:14px; color:var(--text-muted);" id="respEscalaInfo"></div>
+            
+            <div class="add-form" style="margin-bottom: 20px; border:none; padding:0;">
+                <div class="input-wrap full-width">
+                    <label>Quem está lançando? (Escalador)</label>
+                    <select id="respEscalaNome">
+                        <option value="">Selecione seu nome...</option>
+                        <option value="Roberto">Roberto</option>
+                        <option value="Adriano">Adriano</option>
+                        <option value="Marcos">Marcos</option>
+                    </select>
                 </div>
+                <div class="input-wrap">
+                    <label>Entrada</label>
+                    <input type="time" id="respEntrada">
+                </div>
+                <div class="input-wrap">
+                    <label>Saída Final</label>
+                    <input type="time" id="respSaida">
+                </div>
+                <div class="input-wrap">
+                    <label>Início Intervalo 1</label>
+                    <input type="time" id="respInt1Ini">
+                </div>
+                <div class="input-wrap">
+                    <label>Fim Intervalo 1</label>
+                    <input type="time" id="respInt1Fim">
+                </div>
+                <div class="input-wrap">
+                    <label>Início Intervalo 2 (Opção)</label>
+                    <input type="time" id="respInt2Ini">
+                </div>
+                <div class="input-wrap">
+                    <label>Fim Intervalo 2 (Opção)</label>
+                    <input type="time" id="respInt2Fim">
+                </div>
+                <button class="btn btn-save full-width" onclick="salvarRespostaEscala()" style="margin-top:10px;"><i class="fas fa-check"></i> Salvar Horários</button>
+            </div>
         </div>
     </div>
 
