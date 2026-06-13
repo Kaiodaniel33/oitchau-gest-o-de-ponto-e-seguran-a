@@ -467,7 +467,7 @@ const cleanDriverList = [
     { b: "Fretamento JBS", c: "2139", n: "Vanessa Prado de Paula", t: "fretamento" }
 ];
 
-// --- LOGIN ---
+// --- LOGIN E NAVEGAÇÃO ---
 function realizarLogin(e) {
     e.preventDefault();
     if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === 'expresso') {
@@ -512,7 +512,6 @@ function initApp() {
     document.getElementById('datePicker').value = today;
     document.getElementById('escDataRef').value = today;
     
-    // Injeta a base limpa toda vez (se precisar resetar, ative)
     // driversRef.once('value', () => { driversRef.set(cleanDriverList); });
 
     driversRef.on('value', (snapshot) => {
@@ -965,7 +964,7 @@ function marcarEscalaFeito(id) {
 }
 
 // ==========================================
-// --- MÓDULO PRODUTIVIDADE DE HOJE (Ações Realizadas) ---
+// --- MÓDULO PRODUTIVIDADE DE HOJE (Agrupado por Colaborador) ---
 // ==========================================
 let dadosRelatorioHoje = [];
 
@@ -976,63 +975,106 @@ function renderRelatorioDia() {
     let ok = 0, ver = 0, err = 0;
     const tBR = new Date().toLocaleDateString('pt-BR');
 
+    // 1. Coletar e Agrupar todas as ações feitas HOJE por CAD + STATUS
+    let gruposDeAcao = {};
+
     for (const dKey in db) {
         for (const cad in db[dKey]) {
             const rec = db[dKey][cad];
             if (rec.actionDate === tBR && ['OK','Verificado','Erro'].includes(rec.status)) {
-                const dv = driverList.find(d => d.c === cad);
-                dadosRelatorioHoje.push({ 
-                    dataAcao: rec.actionDate,
-                    time: rec.time,
-                    filial: dv ? dv.b : "-",
-                    cad: cad, 
-                    nome: dv ? dv.n : "Desconhecido", 
-                    dataPontoAfetado: dKey,
-                    status: rec.status, 
-                    approver: rec.approver 
-                });
-                if(rec.status === 'OK') ok++; if(rec.status === 'Verificado') ver++; if(rec.status === 'Erro') err++;
+                
+                // Chave única para agrupar (Se o colaborador foi aprovado e reprovado hoje, separa em 2 linhas)
+                const chaveAgrupamento = `${cad}_${rec.status}`;
+
+                if (!gruposDeAcao[chaveAgrupamento]) {
+                    const dv = driverList.find(d => d.c === cad);
+                    gruposDeAcao[chaveAgrupamento] = {
+                        cad: cad,
+                        nome: dv ? dv.n : "Desconhecido",
+                        filial: dv ? dv.b : "-",
+                        status: rec.status,
+                        approver: rec.approver,
+                        time: rec.time, 
+                        datasAfetadas: []
+                    };
+                }
+                
+                // Adiciona o dia do ponto que foi arrumado na lista desse grupo
+                gruposDeAcao[chaveAgrupamento].datasAfetadas.push(dKey);
+                
+                // Pega o horário mais recente da ação feita hoje
+                if (rec.time > gruposDeAcao[chaveAgrupamento].time) {
+                    gruposDeAcao[chaveAgrupamento].time = rec.time;
+                }
             }
         }
     }
+
+    // 2. Processar os grupos para mostrar no Relatório (1 Grupo = 1 Ação/Colaborador)
+    for (const chave in gruposDeAcao) {
+        const grupo = gruposDeAcao[chave];
+        
+        // Ordena as datas do ponto (do menor pro maior)
+        grupo.datasAfetadas.sort();
+        const dInicial = grupo.datasAfetadas[0];
+        const dFinal = grupo.datasAfetadas[grupo.datasAfetadas.length - 1];
+
+        // Formatação visual da data do Ponto Afetado
+        const formataData = (dataStr) => {
+            const pt = dataStr.split('-');
+            return pt.length === 3 ? `${pt[2]}/${pt[1]}/${pt[0]}` : dataStr;
+        };
+
+        const dInicioStr = formataData(dInicial);
+        const dFimStr = formataData(dFinal);
+
+        // Se mexeu só em 1 dia, mostra só ele. Se mexeu em vários, mostra o intervalo.
+        grupo.textoPeriodo = (dInicial === dFinal) ? dInicioStr : `${dInicioStr} a ${dFimStr}`;
+
+        dadosRelatorioHoje.push(grupo);
+
+        // Incrementa o contador de produtividade baseando-se no COLABORADOR agrupado
+        if(grupo.status === 'OK') ok++; 
+        if(grupo.status === 'Verificado') ver++; 
+        if(grupo.status === 'Erro') err++;
+    }
+
     document.getElementById('rel-aprovados').innerText = ok;
     document.getElementById('rel-verificados').innerText = ver;
     document.getElementById('rel-reprovados').innerText = err;
 
+    // 3. Montar a Tabela HTML ordenada pelo horário mais recente
     dadosRelatorioHoje.sort((a,b)=>b.time.localeCompare(a.time)).forEach(item => {
         let statusClass = item.status === 'OK' ? 'st-ok' : (item.status === 'Erro' ? 'st-erro' : 'st-verificado');
         let statusLabel = item.status === 'OK' ? 'Aprovado' : (item.status === 'Erro' ? 'Reprovado' : 'Verificado');
         
-        const pt = item.dataPontoAfetado.split('-');
-        let dPontoFmt = pt.length === 3 ? `${pt[2]}/${pt[1]}/${pt[0]}` : item.dataPontoAfetado;
-
         tbody.innerHTML += `
             <tr>
-                <td style="font-weight:700; color:var(--brand);">${item.dataAcao}</td>
+                <td style="font-weight:700; color:var(--brand);">${tBR}</td>
                 <td style="color:var(--text-muted); font-size:12px;">${item.time}</td>
                 <td>${item.filial}</td>
                 <td><b>${item.cad}</b></td>
                 <td>${item.nome}</td>
-                <td style="font-weight:700;">${dPontoFmt}</td>
+                <td style="font-weight:700; font-size:13px;">${item.textoPeriodo}</td>
                 <td><span class="status-badge ${statusClass}" style="width:100%; box-sizing:border-box; padding:5px;">${statusLabel}</span></td>
                 <td><b>${item.approver}</b></td>
             </tr>`;
     });
 
     if(dadosRelatorioHoje.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Você não realizou nenhuma aprovação, verificação ou reprovação hoje.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Você não realizou nenhuma ação de controle de ponto hoje.</td></tr>`;
     }
 }
 
 function exportarRelatorioDia() {
-    let csv = "\ufeffData da Acao (Hoje);Hora da Acao;Filial;CAD;Nome do Motorista;Ponto Afetado (Data);Status Aplicado;Responsavel\n";
+    let csv = "\ufeffData da Acao (Hoje);Hora da Acao;Filial;CAD;Nome do Motorista;Periodo Afetado;Status Aplicado;Responsavel\n";
+    const tBR = new Date().toLocaleDateString('pt-BR');
+    
     dadosRelatorioHoje.forEach(i => { 
-        const pt = i.dataPontoAfetado.split('-');
-        let dPontoFmt = pt.length === 3 ? `${pt[2]}/${pt[1]}/${pt[0]}` : i.dataPontoAfetado;
         let statusLabel = i.status === 'OK' ? 'Aprovado' : (i.status === 'Erro' ? 'Reprovado' : 'Verificado');
-        csv += `${i.dataAcao};${i.time};${i.filial};${i.cad};${i.nome};${dPontoFmt};${statusLabel};${i.approver}\n`; 
+        csv += `${tBR};${i.time};${i.filial};${i.cad};${i.nome};${i.textoPeriodo};${statusLabel};${i.approver}\n`; 
     });
-    downloadCSV(csv, `Produtividade_Hoje_${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.csv`);
+    downloadCSV(csv, `Produtividade_Hoje_${tBR.replace(/\//g,'-')}.csv`);
 }
 
 // --- OUTRAS EXPORTAÇÕES EXCEL E MODAL BASE ---
