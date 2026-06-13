@@ -512,7 +512,8 @@ function initApp() {
     document.getElementById('datePicker').value = today;
     document.getElementById('escDataRef').value = today;
     
-    driversRef.once('value', () => { driversRef.set(cleanDriverList); });
+    // Injeta a base limpa toda vez (se precisar resetar, ative)
+    // driversRef.once('value', () => { driversRef.set(cleanDriverList); });
 
     driversRef.on('value', (snapshot) => {
         const data = snapshot.val();
@@ -558,7 +559,7 @@ function loadDate() {
     if (currentDateKey) renderTable();
 }
 
-// --- RENDERS DO PONTO COM SELECT DIRETO E CARD REPROVADOS ---
+// --- VISÃO DIÁRIA ---
 function renderTable() {
     const container = document.getElementById('tableContainer');
     if(!container) return;
@@ -595,7 +596,7 @@ function renderTable() {
                         <th width="25%">Nome</th>
                         <th width="20%">Status Direto</th>
                         <th width="20%">Observação / Motivo</th>
-                        <th width="13%">Último Ação</th>
+                        <th width="13%">Última Ação</th>
                         <th width="12%">Hora Ação</th>
                     </tr>
                 </thead>
@@ -659,6 +660,9 @@ function changeStatusDirect(cad, dateKeyStr, novoStatus) {
     let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
     
     historyObj[Date.now()] = { status: novoStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization };
+
+    if (novoStatus === "Pendente" && !currentRecord) return; 
+
     database.ref(path).set({ 
         status: novoStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization, 
         obs: currentRecord ? currentRecord.obs : "", history: historyObj
@@ -961,11 +965,14 @@ function marcarEscalaFeito(id) {
 }
 
 // ==========================================
-// --- MÓDULO PRODUTIVIDADE DE HOJE ---
+// --- MÓDULO PRODUTIVIDADE DE HOJE (Ações Realizadas) ---
 // ==========================================
+let dadosRelatorioHoje = [];
+
 function renderRelatorioDia() {
     const tbody = document.getElementById('tabelaRelatorioDiaBody');
-    tbody.innerHTML = ""; dadosRelatorioHoje = [];
+    tbody.innerHTML = ""; 
+    dadosRelatorioHoje = [];
     let ok = 0, ver = 0, err = 0;
     const tBR = new Date().toLocaleDateString('pt-BR');
 
@@ -974,7 +981,16 @@ function renderRelatorioDia() {
             const rec = db[dKey][cad];
             if (rec.actionDate === tBR && ['OK','Verificado','Erro'].includes(rec.status)) {
                 const dv = driverList.find(d => d.c === cad);
-                dadosRelatorioHoje.push({ dataRef: dKey, cad: cad, nome: dv ? dv.n : "Desconhecido", status: rec.status, approver: rec.approver, time: rec.time });
+                dadosRelatorioHoje.push({ 
+                    dataAcao: rec.actionDate,
+                    time: rec.time,
+                    filial: dv ? dv.b : "-",
+                    cad: cad, 
+                    nome: dv ? dv.n : "Desconhecido", 
+                    dataPontoAfetado: dKey,
+                    status: rec.status, 
+                    approver: rec.approver 
+                });
                 if(rec.status === 'OK') ok++; if(rec.status === 'Verificado') ver++; if(rec.status === 'Erro') err++;
             }
         }
@@ -984,21 +1000,38 @@ function renderRelatorioDia() {
     document.getElementById('rel-reprovados').innerText = err;
 
     dadosRelatorioHoje.sort((a,b)=>b.time.localeCompare(a.time)).forEach(item => {
+        let statusClass = item.status === 'OK' ? 'st-ok' : (item.status === 'Erro' ? 'st-erro' : 'st-verificado');
+        let statusLabel = item.status === 'OK' ? 'Aprovado' : (item.status === 'Erro' ? 'Reprovado' : 'Verificado');
+        
+        const pt = item.dataPontoAfetado.split('-');
+        let dPontoFmt = pt.length === 3 ? `${pt[2]}/${pt[1]}/${pt[0]}` : item.dataPontoAfetado;
+
         tbody.innerHTML += `
             <tr>
-                <td>${item.dataRef.split('-').reverse().join('/')}</td>
+                <td style="font-weight:700; color:var(--brand);">${item.dataAcao}</td>
+                <td style="color:var(--text-muted); font-size:12px;">${item.time}</td>
+                <td>${item.filial}</td>
                 <td><b>${item.cad}</b></td>
                 <td>${item.nome}</td>
-                <td><span class="status-badge st-${item.status==='OK'?'ok':(item.status==='Erro'?'erro':'verificado')}">${item.status==='OK'?'Aprovado':(item.status==='Erro'?'Reprovado':'Verificado')}</span></td>
+                <td style="font-weight:700;">${dPontoFmt}</td>
+                <td><span class="status-badge ${statusClass}" style="width:100%; box-sizing:border-box; padding:5px;">${statusLabel}</span></td>
                 <td><b>${item.approver}</b></td>
-                <td>Hoje às ${item.time}</td>
             </tr>`;
     });
+
+    if(dadosRelatorioHoje.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Você não realizou nenhuma aprovação, verificação ou reprovação hoje.</td></tr>`;
+    }
 }
 
 function exportarRelatorioDia() {
-    let csv = "\ufeffData Referencia;CAD;Nome;Status Aplicado;Responsavel;Hora\n";
-    dadosRelatorioHoje.forEach(i => { csv += `${i.dataRef.split('-').reverse().join('/')};${i.cad};${i.nome};${i.status};${i.approver};${i.time}\n`; });
+    let csv = "\ufeffData da Acao (Hoje);Hora da Acao;Filial;CAD;Nome do Motorista;Ponto Afetado (Data);Status Aplicado;Responsavel\n";
+    dadosRelatorioHoje.forEach(i => { 
+        const pt = i.dataPontoAfetado.split('-');
+        let dPontoFmt = pt.length === 3 ? `${pt[2]}/${pt[1]}/${pt[0]}` : i.dataPontoAfetado;
+        let statusLabel = i.status === 'OK' ? 'Aprovado' : (i.status === 'Erro' ? 'Reprovado' : 'Verificado');
+        csv += `${i.dataAcao};${i.time};${i.filial};${i.cad};${i.nome};${dPontoFmt};${statusLabel};${i.approver}\n`; 
+    });
     downloadCSV(csv, `Produtividade_Hoje_${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.csv`);
 }
 
@@ -1070,4 +1103,3 @@ function getPeriodLimits(dStr) {
     const cur = new Date(dStr + "T12:00:00"); const d = cur.getDate(); const m = cur.getMonth(); const y = cur.getFullYear();
     return d >= 11 ? { start: new Date(y, m, 11), end: new Date(y, m + 1, 10) } : { start: new Date(y, m - 1, 11), end: new Date(y, m, 10) };
 }
-let dadosRelatorioHoje = [];
