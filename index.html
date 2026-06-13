@@ -68,11 +68,10 @@
             <button class="main-tab active" id="tab-dia" onclick="switchMainTab('dia')"><i class="fas fa-calendar-day"></i> Ponto Diário</button>
             <button class="main-tab" id="tab-individual" onclick="switchMainTab('individual')"><i class="fas fa-user-clock"></i> Ponto Individual</button>
             <button class="main-tab" id="tab-escala" onclick="switchMainTab('escala')"><i class="fas fa-clipboard-list"></i> Solicitação de Horários (Escala)</button>
+            <button class="main-tab" id="tab-relatorio" onclick="switchMainTab('relatorio'); renderRelatorioDia();"><i class="fas fa-chart-pie"></i> Relatório de Ações de Hoje</button>
         </div>
 
-        <!-- ABA: VISÃO DIÁRIA -->
         <div id="view-dia" class="view-section active">
-            
             <div class="sector-tabs">
                 <button class="sector-tab active" id="sec-rodoviario" onclick="switchSector('rodoviario')"><i class="fas fa-road"></i> Motoristas Rodoviários</button>
                 <button class="sector-tab" id="sec-fretamento" onclick="switchSector('fretamento')"><i class="fas fa-shuttle-van"></i> Fretamento</button>
@@ -94,11 +93,15 @@
             <div class="summary-bar">
                 <div class="card card-ok">
                     <div class="card-icon"><i class="fas fa-check-circle"></i></div>
-                    <div class="card-info"><h3 id="count-ok">0</h3><span>Aprovados / Verificados</span></div>
+                    <div class="card-info"><h3 id="count-ok">0</h3><span>Aprovados / Verif.</span></div>
                 </div>
                 <div class="card card-pending">
                     <div class="card-icon"><i class="fas fa-clock"></i></div>
                     <div class="card-info"><h3 id="count-pending">0</h3><span>Pendentes</span></div>
+                </div>
+                <div class="card card-erro">
+                    <div class="card-icon"><i class="fas fa-times-circle"></i></div>
+                    <div class="card-info"><h3 id="count-erro">0</h3><span>Reprovados</span></div>
                 </div>
                 <div class="card card-total">
                     <div class="card-icon"><i class="fas fa-users"></i></div>
@@ -109,7 +112,6 @@
             <div id="tableContainer"></div>
         </div>
 
-        <!-- ABA: VISÃO INDIVIDUAL -->
         <div id="view-individual" class="view-section">
             <div class="individual-panel">
                 <div class="indiv-top-section">
@@ -150,22 +152,18 @@
                                 <th width="15%">Data Ref.</th>
                                 <th width="20%">Status Atual</th>
                                 <th width="25%">Observação / Justificativa</th>
-                                <th width="20%">Último Ação</th>
+                                <th width="20%">Última Ação</th>
                                 <th width="20%">Ação Individual</th>
                             </tr>
                         </thead>
-                        <tbody id="indivPeriodTableBody">
-                        </tbody>
+                        <tbody id="indivPeriodTableBody"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- ABA: SOLICITAÇÃO DE ESCALAS -->
         <div id="view-escala" class="view-section">
             <div class="individual-panel">
-                
-                <!-- Formulário de Nova Solicitação -->
                 <div style="background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 25px; margin-bottom: 25px;">
                     <h3 style="margin-top:0; color:var(--brand); display:flex; align-items:center; gap:10px;"><i class="fas fa-bullhorn"></i> Abrir Solicitação de Horário para Escalador</h3>
                     
@@ -196,7 +194,7 @@
                                 <option value="">Selecione seu nome...</option>
                                 <option value="Kaio">Kaio</option>
                                 <option value="Bruna">Bruna</option>
-                                <option value="Tainá">Tainá</option>
+                                <option value="Tayná">Tayná</option>
                                 <option value="Paloma">Paloma</option>
                             </select>
                         </div>
@@ -206,9 +204,14 @@
                     </div>
                 </div>
 
-                <!-- Painel/Grid de Escalas -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                    <h3 style="margin:0;"><i class="fas fa-list-ul"></i> Painel de Ajustes de Escala</h3>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 15px;">
+                    <div style="flex:1;">
+                        <h3 style="margin:0 0 15px 0;"><i class="fas fa-list-ul"></i> Painel de Ajustes de Escala</h3>
+                        <div class="sector-tabs" style="margin-bottom:0;">
+                            <button class="sector-tab active" id="escTabPendentes" onclick="setEscalaFilter('pendentes')"><i class="fas fa-clock"></i> Pendentes / Em Andamento</button>
+                            <button class="sector-tab" id="escTabConcluidos" onclick="setEscalaFilter('concluidos')"><i class="fas fa-check-double"></i> Concluídos</button>
+                        </div>
+                    </div>
                     <button class="btn btn-excel-period" onclick="exportarEscalaExcel()"><i class="fas fa-file-excel"></i> Exportar Planilha de Escala</button>
                 </div>
                 
@@ -224,16 +227,55 @@
                             <th width="15%">Status / Ação</th>
                         </tr>
                     </thead>
-                    <tbody id="tabelaEscalaBody">
-                        <!-- Gerado via JS -->
-                    </tbody>
+                    <tbody id="tabelaEscalaBody"></tbody>
                 </table>
             </div>
         </div>
 
+        <div id="view-relatorio" class="view-section">
+            <div class="individual-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                    <h3 style="margin:0; color:var(--brand);"><i class="fas fa-chart-line"></i> Produtividade: Ações Realizadas Hoje</h3>
+                    <button class="btn btn-excel-day" onclick="exportarRelatorioDia()"><i class="fas fa-file-excel"></i> Exportar Produtividade de Hoje</button>
+                </div>
+
+                <div class="summary-bar" style="margin-bottom: 25px;">
+                    <div class="card card-ok">
+                        <div class="card-icon"><i class="fas fa-check"></i></div>
+                        <div class="card-info"><h3 id="rel-aprovados">0</h3><span>Aprovados Hoje</span></div>
+                    </div>
+                    <div class="card card-pending" style="border-left-color:#0284C7;">
+                        <div class="card-icon" style="color:#0284C7; background:#E0F2FE;"><i class="fas fa-search"></i></div>
+                        <div class="card-info"><h3 id="rel-verificados">0</h3><span>Verificados Hoje</span></div>
+                    </div>
+                    <div class="card card-erro">
+                        <div class="card-icon"><i class="fas fa-times"></i></div>
+                        <div class="card-info"><h3 id="rel-reprovados">0</h3><span>Reprovados Hoje</span></div>
+                    </div>
+                </div>
+
+                <table class="modern-table">
+                    <thead>
+                        <tr>
+                            <th width="15%">Data Ref. do Ponto</th>
+                            <th width="15%">CAD</th>
+                            <th width="25%">Nome do Motorista</th>
+                            <th width="15%">Status Aplicado</th>
+                            <th width="15%">Responsável (Quem fez)</th>
+                            <th width="15%">Hora da Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaRelatorioDiaBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="main-footer">
+            <p>Feito por Kaio Daniel de Souza. Todos os direitos reservados.</p>
+            <p>Sistema desenvolvido para a empresa Expresso Nordeste para fins trabalhistas. Uso exclusivo da equipe do Departamento Operacional.</p>
+        </div>
     </div>
 
-    <!-- Modal Gerenciar Base -->
     <div class="modal-overlay" id="manageModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -267,7 +309,6 @@
         </div>
     </div>
 
-    <!-- Modal Histórico de Aprovações de Ponto -->
     <div class="modal-overlay" id="historyModal">
         <div class="modal-content" style="width: 500px;">
             <div class="modal-header">
@@ -278,11 +319,10 @@
         </div>
     </div>
 
-    <!-- Modal de Resposta do Escalador -->
     <div class="modal-overlay" id="escalaRespModal">
         <div class="modal-content" style="width: 500px;">
             <div class="modal-header">
-                <h2><i class="fas fa-edit"></i> Definir Horários (Escalador)</h2>
+                <h2><i class="fas fa-edit"></i> Definir/Editar Horários (Escalador)</h2>
                 <span class="close-btn" onclick="closeEscalaModal()">✕</span>
             </div>
             <input type="hidden" id="respEscalaId">
