@@ -10,6 +10,7 @@
 </head>
 <body>
 
+    <!-- TELA DE LOGIN -->
     <div id="loginScreen" class="login-wrapper">
         <div class="login-card">
             <div class="login-logo">
@@ -32,6 +33,7 @@
         </div>
     </div>
 
+    <!-- APLICATIVO PRINCIPAL -->
     <div id="mainApp" style="display: none;">
         <div class="top-panel">
             <div class="title-box">
@@ -64,6 +66,7 @@
             </div>
         </div>
 
+        <!-- ABAS PRINCIPAIS DE NAVEGAÇÃO -->
         <div class="main-tabs">
             <button class="main-tab active" id="tab-dia" onclick="switchMainTab('dia')"><i class="fas fa-calendar-day"></i> Ponto Diário</button>
             <button class="main-tab" id="tab-individual" onclick="switchMainTab('individual')"><i class="fas fa-user-clock"></i> Ponto Individual</button>
@@ -71,6 +74,7 @@
             <button class="main-tab" id="tab-relatorio" onclick="switchMainTab('relatorio'); renderRelatorioDia();"><i class="fas fa-chart-pie"></i> Relatório de Ações de Hoje</button>
         </div>
 
+        <!-- ABA 1: VISÃO DIÁRIA -->
         <div id="view-dia" class="view-section active">
             <div class="sector-tabs">
                 <button class="sector-tab active" id="sec-rodoviario" onclick="switchSector('rodoviario')"><i class="fas fa-road"></i> Motoristas Rodoviários</button>
@@ -112,6 +116,7 @@
             <div id="tableContainer"></div>
         </div>
 
+        <!-- ABA 2: VISÃO INDIVIDUAL -->
         <div id="view-individual" class="view-section">
             <div class="individual-panel">
                 <div class="indiv-top-section">
@@ -162,6 +167,7 @@
             </div>
         </div>
 
+        <!-- ABA 3: SOLICITAÇÃO DE ESCALAS -->
         <div id="view-escala" class="view-section">
             <div class="individual-panel">
                 <div style="background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 25px; margin-bottom: 25px;">
@@ -232,6 +238,7 @@
             </div>
         </div>
 
+        <!-- ABA 4: RELATÓRIO DE AÇÕES DE HOJE (PRODUTIVIDADE E AUDITORIA) -->
         <div id="view-relatorio" class="view-section">
             <div class="individual-panel">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
@@ -257,12 +264,14 @@
                 <table class="modern-table">
                     <thead>
                         <tr>
-                            <th width="15%">Data Ref. do Ponto</th>
-                            <th width="15%">CAD</th>
-                            <th width="25%">Nome do Motorista</th>
-                            <th width="15%">Status Aplicado</th>
-                            <th width="15%">Responsável (Quem fez)</th>
-                            <th width="15%">Hora da Ação</th>
+                            <th width="10%">Ação (Hoje)</th>
+                            <th width="10%">Hora</th>
+                            <th width="15%">Filial</th>
+                            <th width="10%">CAD</th>
+                            <th width="20%">Motorista</th>
+                            <th width="12%">Ponto Afetado</th>
+                            <th width="10%">Status</th>
+                            <th width="13%">Responsável</th>
                         </tr>
                     </thead>
                     <tbody id="tabelaRelatorioDiaBody"></tbody>
@@ -270,12 +279,14 @@
             </div>
         </div>
 
+        <!-- RODAPÉ SISTÊMICO -->
         <div class="main-footer">
             <p>Feito por Kaio Daniel de Souza. Todos os direitos reservados.</p>
             <p>Sistema desenvolvido para a empresa Expresso Nordeste para fins trabalhistas. Uso exclusivo da equipe do Departamento Operacional.</p>
         </div>
     </div>
 
+    <!-- MODAL: GESTÃO DA BASE -->
     <div class="modal-overlay" id="manageModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -309,6 +320,7 @@
         </div>
     </div>
 
+    <!-- MODAL: HISTÓRICO DE MUDANÇAS -->
     <div class="modal-overlay" id="historyModal">
         <div class="modal-content" style="width: 500px;">
             <div class="modal-header">
@@ -319,6 +331,7 @@
         </div>
     </div>
 
+    <!-- MODAL: RESPOSTA DO ESCALADOR -->
     <div class="modal-overlay" id="escalaRespModal">
         <div class="modal-content" style="width: 500px;">
             <div class="modal-header">
