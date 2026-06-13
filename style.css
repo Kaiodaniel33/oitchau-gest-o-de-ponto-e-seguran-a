@@ -164,6 +164,14 @@ table.modern-table tr:hover { background: #F8FAFC; }
 .btn-del { background: var(--btn-reprove); color: white; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; transition: 0.2s;}
 .btn-del:hover { background: #B91C1C; }
 
-/* Footer */
-.main-footer { text-align: center; padding: 30px 20px; margin-top: 40px; border-top: 1px dashed var(--border); color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+/* FOOTER PROFISSIONAL DA EXPRESSO NORDESTE */
+.main-footer {
+    text-align: center;
+    padding: 30px 20px;
+    margin-top: 40px;
+    border-top: 1px dashed var(--border);
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
 .main-footer p { margin: 0; }
