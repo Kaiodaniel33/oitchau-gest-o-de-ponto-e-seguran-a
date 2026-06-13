@@ -14,16 +14,18 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const dbRef = database.ref('pontos');
 const driversRef = database.ref('equipe');
+const escalaRef = database.ref('escala_pedidos'); // NOVO BANCO DA ESCALA
 
 // --- VARIÁVEIS GLOBAIS ---
 let driverList = [];
 let db = {}; 
+let escalaData = {}; 
 let currentApprover = "";
 let currentDateKey = "";
 let selectedIndivCad = ""; 
 let currentSector = "rodoviario"; 
 
-// --- BASE DE DADOS LIMPA ---
+// --- BASE DE DADOS LIMPA (MANTIDA INTACTA DA SUA LISTA) ---
 const cleanDriverList = [
     // RODOVIÁRIOS - APUCARANA
     { b: "Apucarana", c: "21001", n: "Anderson Patricio Schatz", t: "rodoviario" },
@@ -494,6 +496,7 @@ function switchMainTab(tabName) {
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
     document.getElementById('tab-' + tabName).classList.add('active');
     document.getElementById('view-' + tabName).classList.add('active');
+    if(tabName === 'escala') renderEscalaTable();
 }
 
 function switchSector(sector) {
@@ -516,10 +519,9 @@ function initApp() {
 
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('datePicker').value = today;
+    document.getElementById('escDataRef').value = today;
     
-    driversRef.once('value', (snapshot) => {
-        driversRef.set(cleanDriverList);
-    });
+    driversRef.once('value', (snapshot) => { driversRef.set(cleanDriverList); });
 
     driversRef.on('value', (snapshot) => {
         const data = snapshot.val();
@@ -538,6 +540,11 @@ function initApp() {
     }, (error) => {
         console.error(error);
         updateStatus(false);
+    });
+
+    escalaRef.on('value', (snapshot) => {
+        escalaData = snapshot.val() || {};
+        renderEscalaTable();
     });
 
     loadDate();
@@ -573,7 +580,7 @@ function loadDate() {
     renderTable();
 }
 
-// --- RENDERS COM NOVOS STATUS E ÍCONE DE HISTÓRICO ---
+// --- FIM DOS CLIQUES INFINITOS: MENU DE SELEÇÃO NO VISÃO DIA ---
 function renderTable() {
     const container = document.getElementById('tableContainer');
     if(!container) return;
@@ -613,9 +620,9 @@ function renderTable() {
                     <tr>
                         <th width="10%">CAD</th>
                         <th width="25%">Nome</th>
-                        <th width="18%">Status</th>
-                        <th width="22%">Observação / Motivo</th>
-                        <th width="13%">Aprovador</th>
+                        <th width="20%">Status Direto</th>
+                        <th width="20%">Observação / Motivo</th>
+                        <th width="13%">Último Ação</th>
                         <th width="12%">Hora Ação</th>
                     </tr>
                 </thead>
@@ -632,8 +639,7 @@ function renderTable() {
             if (status === 'OK' || status === 'Verificado') countOK++;
             else countPending++;
 
-            let badgeClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : (status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
-            let statusLabel = status === 'OK' ? 'Aprovado' : (status === 'Erro' ? 'Reprovado' : (status === 'Verificado' ? 'Verificado' : 'Pendente'));
+            let selectClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : (status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
 
             html += `
                 <tr>
@@ -641,7 +647,12 @@ function renderTable() {
                     <td>${d.n}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="status-badge ${badgeClass}" onclick="cycleStatus('${d.c}', '${currentDateKey}')">${statusLabel}</span>
+                            <select class="status-select ${selectClass}" onchange="changeStatusDirect('${d.c}', '${currentDateKey}', this.value)">
+                                <option value="Pendente" ${status==='Pendente'?'selected':''}>Pendente</option>
+                                <option value="OK" ${status==='OK'?'selected':''}>Aprovado</option>
+                                <option value="Verificado" ${status==='Verificado'?'selected':''}>Verificado</option>
+                                <option value="Erro" ${status==='Erro'?'selected':''}>Reprovado</option>
+                            </select>
                             <i class="fas fa-history text-muted" style="cursor:pointer; font-size:14px;" onclick="openHistoryModal('${d.c}', '${currentDateKey}')" title="Ver Histórico"></i>
                         </div>
                     </td>
@@ -667,6 +678,125 @@ function renderTable() {
     document.getElementById('count-ok').innerText = countOK;
     document.getElementById('count-pending').innerText = countPending;
     document.getElementById('count-total').innerText = totalSector;
+}
+
+// Muda o status através do select dropdown direto
+function changeStatusDirect(cad, dateKeyStr, novoStatus) {
+    if (!currentApprover) { alert("Insira seu nome no topo da tela para alterar status!"); return; }
+    
+    const path = `pontos/${dateKeyStr}/${cad}`;
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
+    const currentRecord = (db[dateKeyStr] && db[dateKeyStr][cad]) ? db[dateKeyStr][cad] : null;
+    let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+    
+    historyObj[Date.now()] = { status: novoStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization };
+
+    if (novoStatus === "Pendente" && !currentRecord) return; // Não faz nada se já não existir
+
+    database.ref(path).set({ 
+        status: novoStatus, 
+        approver: currentApprover, 
+        time: timeNow, 
+        actionDate: dateRealization, 
+        obs: currentRecord ? currentRecord.obs : "",
+        history: historyObj
+    });
+}
+
+function saveObs(cad, dateKeyStr, text) {
+    const path = `pontos/${dateKeyStr}/${cad}`;
+    const currentRecord = (db[dateKeyStr] && db[dateKeyStr][cad]) ? db[dateKeyStr][cad] : null;
+    if (!currentRecord) {
+        const timeNow = new Date().toLocaleTimeString('pt-BR');
+        const dateRealization = new Date().toLocaleDateString('pt-BR');
+        let historyObj = {};
+        historyObj[Date.now()] = { status: "Pendente", approver: "-", time: timeNow, actionDate: dateRealization };
+        database.ref(path).set({ status: "Pendente", approver: "-", time: timeNow, actionDate: dateRealization, obs: text, history: historyObj });
+    } else {
+        database.ref(path).update({ obs: text });
+    }
+}
+
+// --- AÇÕES EM MASSA ---
+function actionAllDaily(targetStatus) {
+    if (!currentApprover) { alert("Nome de Aprovador Obrigatório!"); return; }
+    let confirmMsg = targetStatus === 'OK' ? "APROVAR" : (targetStatus === 'Erro' ? "REPROVAR" : (targetStatus === 'Verificado' ? "VERIFICAR" : "LIMPAR E PENDENCIAR"));
+    if (!confirm(`Deseja ${confirmMsg} TODOS os colaboradores (${currentSector.toUpperCase()}) da tela do dia ${currentDateKey}?`)) return;
+    
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
+    const updates = {};
+    let idx = 0;
+
+    driverList.forEach(d => {
+        const tipo = d.t || 'rodoviario';
+        if(tipo === currentSector) {
+            if(targetStatus === 'Pendente' && (!db[currentDateKey] || !db[currentDateKey][d.c])) return; // Skip if already empty
+            
+            const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
+            const currentObs = currentRecord ? currentRecord.obs : "";
+            let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+            
+            historyObj[Date.now() + "_" + (idx++)] = { status: targetStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization };
+            updates[`pontos/${currentDateKey}/${d.c}`] = { status: targetStatus, approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
+        }
+    });
+    database.ref().update(updates);
+}
+
+function approveAllDaily() { actionAllDaily('OK'); }
+function reproveAllDaily() { actionAllDaily('Erro'); }
+function verifyAllDaily() { actionAllDaily('Verificado'); }
+function cancelAllDaily() { actionAllDaily('Pendente'); }
+
+function approveBranch(branchName) {
+    if (!currentApprover) { alert("Insira seu nome no topo da tela!"); return; }
+    if (!confirm(`Confirmar aprovação de TODOS os motoristas exibidos na filial ${branchName}?`)) return;
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
+    const updates = {};
+    let idx = 0;
+
+    driverList.forEach(d => {
+        const tipo = d.t || 'rodoviario';
+        if (d.b === branchName && tipo === currentSector) {
+            const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
+            const currentObs = currentRecord ? currentRecord.obs : "";
+            let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+            
+            historyObj[Date.now() + "_" + (idx++)] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization };
+            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
+        }
+    });
+    database.ref().update(updates);
+}
+
+// --- VISÃO INDIVIDUAL DETALHADA ---
+function searchDriver() {
+    const term = document.getElementById('indivSearchInput').value.trim().toLowerCase();
+    const resDiv = document.getElementById('indivSearchResult');
+    
+    if (!term) { resDiv.style.display = 'none'; document.getElementById('indivPeriodContainer').style.display = 'none'; return; }
+    const found = driverList.find(d => d.c === term || d.n.toLowerCase().includes(term));
+
+    resDiv.style.display = 'block';
+    if (found) {
+        selectedIndivCad = found.c;
+        const tipoStr = found.t === 'fretamento' ? 'Fretamento' : 'Motorista Rodoviário';
+        resDiv.style.background = '#F0FDF4';
+        resDiv.style.color = '#065F46';
+        resDiv.style.borderColor = '#10B981';
+        resDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>Colaborador Localizado:</b><br><span style="font-size: 19px; font-weight:800; display:block; margin:5px 0;">${found.n}</span>Filial: ${found.b} | CAD: ${found.c} | Setor: ${tipoStr}`;
+        renderIndividualPeriod(); 
+    } else {
+        selectedIndivCad = "";
+        resDiv.style.background = '#FEE2E2';
+        resDiv.style.color = '#991B1B';
+        resDiv.style.borderColor = '#EF4444';
+        resDiv.innerHTML = `<i class="fas fa-times-circle"></i> <b>Não localizado.</b><br>Verifique se o CAD ou o Nome estão corretos.`;
+        document.getElementById('indivPeriodContainer').style.display = 'none';
+    }
 }
 
 function renderIndividualPeriod() {
@@ -701,8 +831,7 @@ function renderIndividualPeriod() {
         const approver = record ? record.approver : "-";
         const time = record ? record.time : "-";
 
-        let badgeClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : (status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
-        let statusLabel = status === 'OK' ? 'Aprovado' : (status === 'Erro' ? 'Reprovado' : (status === 'Verificado' ? 'Verificado' : 'Pendente'));
+        let selectClass = status === 'OK' ? 'st-ok' : (status === 'Erro' ? 'st-erro' : (status === 'Verificado' ? 'st-verificado' : 'st-pendente'));
         let dataStr = loopDate.toLocaleDateString('pt-BR');
 
         tbody.innerHTML += `
@@ -710,7 +839,12 @@ function renderIndividualPeriod() {
                 <td style="font-weight:700; color:var(--text);">${dataStr}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="status-badge ${badgeClass}" style="cursor:default;">${statusLabel}</span>
+                        <select class="status-select ${selectClass}" onchange="changeStatusDirect('${selectedIndivCad}', '${dateKeyStr}', this.value)">
+                            <option value="Pendente" ${status==='Pendente'?'selected':''}>Pendente</option>
+                            <option value="OK" ${status==='OK'?'selected':''}>Aprovado</option>
+                            <option value="Verificado" ${status==='Verificado'?'selected':''}>Verificado</option>
+                            <option value="Erro" ${status==='Erro'?'selected':''}>Reprovado</option>
+                        </select>
                         <i class="fas fa-history text-muted" style="cursor:pointer; font-size:14px;" onclick="openHistoryModal('${selectedIndivCad}', '${dateKeyStr}')" title="Ver Histórico"></i>
                     </div>
                 </td>
@@ -725,6 +859,7 @@ function renderIndividualPeriod() {
                 <td>
                     <div style="display:flex; gap:5px;">
                         <button class="btn btn-save btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'OK')" title="Aprovar este dia"><i class="fas fa-check"></i></button>
+                        <button class="btn btn-verify btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Verificado')" title="Verificar este dia"><i class="fas fa-search"></i></button>
                         <button class="btn btn-reprove btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Erro')" title="Reprovar este dia"><i class="fas fa-times"></i></button>
                         <button class="btn btn-undo btn-small" onclick="applyIndividualDayAction('${dateKeyStr}', 'Pendente')" title="Voltar Pendente"><i class="fas fa-undo"></i></button>
                     </div>
@@ -735,142 +870,50 @@ function renderIndividualPeriod() {
     }
 }
 
-// --- CICLOS E LOGS COM DATA DA REALIZAÇÃO ---
-function cycleStatus(cad, dateKeyStr) {
-    if (!currentApprover) { alert("Insira seu nome no topo da tela para aprovar!"); return; }
-    const currentRecord = (db[dateKeyStr] && db[dateKeyStr][cad]) ? db[dateKeyStr][cad] : null;
-    const currentStatus = currentRecord ? currentRecord.status : "Pendente";
-    
-    let next = "OK";
-    if (currentStatus === "Pendente") next = "OK";
-    else if (currentStatus === "OK") next = "Erro";
-    else if (currentStatus === "Erro") next = "Verificado";
-    else if (currentStatus === "Verificado") next = "Pendente";
-    
-    const path = `pontos/${dateKeyStr}/${cad}`;
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateRealization = new Date().toLocaleDateString('pt-BR');
-    
-    let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-    const logId = Date.now() + "_" + Math.floor(Math.random() * 1000);
-    
-    historyObj[logId] = {
-        status: next,
-        approver: currentApprover,
-        time: timeNow,
-        actionDate: dateRealization
-    };
-
-    database.ref(path).set({ 
-        status: next, 
-        approver: currentApprover, 
-        time: timeNow, 
-        actionDate: dateRealization, 
-        obs: currentRecord ? currentRecord.obs : "",
-        history: historyObj
-    });
+function applyIndividualDayAction(dateKeyStr, statusType) {
+    changeStatusDirect(selectedIndivCad, dateKeyStr, statusType);
 }
 
-function saveObs(cad, dateKeyStr, text) {
-    const path = `pontos/${dateKeyStr}/${cad}`;
-    const currentRecord = (db[dateKeyStr] && db[dateKeyStr][cad]) ? db[dateKeyStr][cad] : null;
-    if (!currentRecord) {
-        const timeNow = new Date().toLocaleTimeString('pt-BR');
-        const dateRealization = new Date().toLocaleDateString('pt-BR');
-        let historyObj = {};
-        historyObj[Date.now()] = { status: "Pendente", approver: "-", time: timeNow, actionDate: dateRealization };
-        database.ref(path).set({ status: "Pendente", approver: "-", time: timeNow, actionDate: dateRealization, obs: text, history: historyObj });
-    } else {
-        database.ref(path).update({ obs: text });
+function applyIndividualAction(statusType) {
+    const approver = document.getElementById('approverName').value;
+    if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
+    if (!selectedIndivCad) { alert("Busque e selecione um colaborador válido primeiro."); return; }
+
+    const startVal = document.getElementById('indivStartDate').value;
+    const endVal = document.getElementById('indivEndDate').value;
+
+    if(!startVal || !endVal) { alert("Defina o período (Data Inicial e Final)!"); return; }
+
+    const start = new Date(startVal + "T12:00:00");
+    const end = new Date(endVal + "T12:00:00");
+
+    if(start > end) { alert("A Data Inicial não pode ser maior que a Final!"); return; }
+
+    let actionName = statusType === 'OK' ? "APROVAR" : (statusType === 'Erro' ? "REPROVAR" : (statusType === 'Verificado' ? "MARCAR COMO VERIFICADO" : "DEIXAR PENDENTE"));
+    if(!confirm(`${actionName} TODO O PERÍODO\n\nTem certeza que deseja aplicar isso para todos os dias selecionados?`)) return;
+
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateRealization = new Date().toLocaleDateString('pt-BR');
+    const updates = {};
+    let loopDate = new Date(start);
+    let idx = 0;
+
+    while(loopDate <= end) {
+        const dateKey = loopDate.toISOString().split('T')[0];
+        const path = `pontos/${dateKey}/${selectedIndivCad}`;
+        const currentRecord = (db[dateKey] && db[dateKey][selectedIndivCad]) ? db[dateKey][selectedIndivCad] : null;
+        const currentObs = currentRecord ? currentRecord.obs : "";
+        
+        let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
+        historyObj[Date.now() + "_" + (idx++)] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization };
+
+        updates[path] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
+        loopDate.setDate(loopDate.getDate() + 1);
     }
-}
 
-function approveBranch(branchName) {
-    if (!currentApprover) { alert("Insira seu nome no topo da tela!"); return; }
-    if (!confirm(`Confirmar aprovação de TODOS os motoristas exibidos na filial ${branchName}?`)) return;
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateRealization = new Date().toLocaleDateString('pt-BR');
-    const updates = {};
-    let idx = 0;
-
-    driverList.forEach(d => {
-        const tipo = d.t || 'rodoviario';
-        if (d.b === branchName && tipo === currentSector) {
-            const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
-            const currentObs = currentRecord ? currentRecord.obs : "";
-            let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-            
-            historyObj[Date.now() + "_" + (idx++)] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization };
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
-        }
-    });
-    database.ref().update(updates);
-}
-
-// --- AÇÕES EM MASSA ---
-function approveAllDaily() {
-    if (!currentApprover) { alert("Nome de Aprovador Obrigatório!"); return; }
-    if (!confirm(`Aprovar TODOS os colaboradores (${currentSector.toUpperCase()}) da tela do dia ${currentDateKey}?`)) return;
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateRealization = new Date().toLocaleDateString('pt-BR');
-    const updates = {};
-    let idx = 0;
-
-    driverList.forEach(d => {
-        const tipo = d.t || 'rodoviario';
-        if(tipo === currentSector) {
-            const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
-            const currentObs = currentRecord ? currentRecord.obs : "";
-            let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-            
-            historyObj[Date.now() + "_" + (idx++)] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization };
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "OK", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
-        }
-    });
-    database.ref().update(updates);
-}
-
-function reproveAllDaily() {
-    if (!currentApprover) { alert("Nome de Aprovador Obrigatório!"); return; }
-    if (!confirm(`REPROVAR TODOS os colaboradores (${currentSector.toUpperCase()}) para o dia ${currentDateKey}?`)) return;
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateRealization = new Date().toLocaleDateString('pt-BR');
-    const updates = {};
-    let idx = 0;
-
-    driverList.forEach(d => {
-        const tipo = d.t || 'rodoviario';
-        if(tipo === currentSector) {
-            const currentRecord = (db[currentDateKey] && db[currentDateKey][d.c]) ? db[currentDateKey][d.c] : null;
-            const currentObs = currentRecord ? currentRecord.obs : "";
-            let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-            
-            historyObj[Date.now() + "_" + (idx++)] = { status: "Erro", approver: currentApprover, time: timeNow, actionDate: dateRealization };
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "Erro", approver: currentApprover, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
-        }
-    });
-    database.ref().update(updates);
-}
-
-function cancelAllDaily() {
-    if (!confirm(`Isso vai LIMPAR e deixar PENDENTE todas as aprovações de HOJE na tela atual.\nConfirmar?`)) return;
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateRealization = new Date().toLocaleDateString('pt-BR');
-    const updates = {};
-    let idx = 0;
-
-    driverList.forEach(d => {
-        const tipo = d.t || 'rodoviario';
-        if(tipo === currentSector && db[currentDateKey] && db[currentDateKey][d.c]) {
-            const currentRecord = db[currentDateKey][d.c];
-            const currentObs = currentRecord.obs || "";
-            let historyObj = currentRecord.history ? currentRecord.history : {};
-            
-            historyObj[Date.now() + "_" + (idx++)] = { status: "Pendente", approver: currentApprover || "Sistema", time: timeNow, actionDate: dateRealization };
-            updates[`pontos/${currentDateKey}/${d.c}`] = { status: "Pendente", approver: currentApprover || "Sistema", time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
-        }
-    });
-    database.ref().update(updates);
+    database.ref().update(updates)
+        .then(() => alert(`Operação finalizada com sucesso!`))
+        .catch((err) => alert("Erro: " + err.message));
 }
 
 // --- MODAL DE HISTÓRICO JS ---
@@ -886,7 +929,7 @@ function openHistoryModal(cad, dateKeyStr) {
     }
     
     let html = '<div style="display:flex; flex-direction:column; gap:12px; padding: 5px 0;">';
-    const sortedKeys = Object.keys(record.history).sort();
+    const sortedKeys = Object.keys(record.history).sort((a,b) => b.localeCompare(a)); // Ordem reversa (mais recente no topo)
     
     sortedKeys.forEach(key => {
         const log = record.history[key];
@@ -897,7 +940,7 @@ function openHistoryModal(cad, dateKeyStr) {
             <div style="background:#F8FAFC; border:1px solid var(--border); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:6px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span class="status-badge ${badgeClass}" style="cursor:default; width:auto; padding:4px 10px; font-size:11px;">${statusLabel}</span>
-                    <span style="font-size:11px; color:var(--text-muted); font-weight:600;">Realizado em: ${log.actionDate || '-'} às ${log.time || '-'}</span>
+                    <span style="font-size:11px; color:var(--text-muted); font-weight:600;">Feito em: ${log.actionDate || '-'} às ${log.time || '-'}</span>
                 </div>
                 <div style="font-size:13px; color:var(--text); font-weight:500;">
                     <i class="fas fa-user-shield" style="color:var(--brand); margin-right:4px;"></i> Por: <b>${log.approver}</b>
@@ -913,7 +956,217 @@ function closeHistoryModal() {
     document.getElementById('historyModal').style.display = 'none';
 }
 
-// --- GESTÃO DE EQUIPE ---
+
+// ==========================================
+// --- NOVO MÓDULO: TRATATIVA DE ESCALA ---
+// ==========================================
+
+function autoFillEscalaName() {
+    const cad = document.getElementById('escCad').value.trim();
+    const nomeInput = document.getElementById('escNome');
+    if(!cad) { nomeInput.value = ""; return; }
+    
+    const found = driverList.find(d => d.c === cad);
+    if(found) {
+        nomeInput.value = found.n;
+    } else {
+        nomeInput.value = "CAD Não Encontrado na Base";
+    }
+}
+
+function abrirSolicitacaoEscala() {
+    const cad = document.getElementById('escCad').value.trim();
+    const nome = document.getElementById('escNome').value;
+    const tipo = document.getElementById('escTipo').value;
+    const dataRef = document.getElementById('escDataRef').value;
+    const solicitante = document.getElementById('escSolicitante').value;
+
+    if(!cad || !dataRef || !solicitante) {
+        alert("Preencha o CAD, a Data e informe quem está Solicitando!");
+        return;
+    }
+    if(nome === "CAD Não Encontrado na Base") {
+        alert("Utilize um CAD válido cadastrado na base.");
+        return;
+    }
+
+    const idUnico = "ESC_" + Date.now();
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateNow = new Date().toLocaleDateString('pt-BR');
+
+    const novoPedido = {
+        cad: cad,
+        nome: nome,
+        tipo: tipo,
+        dataRef: dataRef,
+        solicitante: solicitante,
+        status: "Pendente",
+        dataAbertura: `${dateNow} ${timeNow}`
+    };
+
+    escalaRef.child(idUnico).set(novoPedido)
+        .then(() => {
+            alert("Solicitação enviada aos escaladores com sucesso!");
+            document.getElementById('escCad').value = "";
+            document.getElementById('escNome').value = "";
+        });
+}
+
+function renderEscalaTable() {
+    const tbody = document.getElementById('tabelaEscalaBody');
+    if(!tbody) return;
+    tbody.innerHTML = "";
+
+    const keys = Object.keys(escalaData).sort((a,b) => b.localeCompare(a)); // mais novos primeiro
+
+    keys.forEach(k => {
+        const item = escalaData[k];
+        
+        let statusClass = "st-pendente";
+        if(item.status === "Respondido") statusClass = "st-verificado";
+        if(item.status === "Feito") statusClass = "st-ok";
+
+        let tdHorarios = "<span style='color:var(--text-muted); font-size:12px;'>Aguardando Preenchimento</span>";
+        if(item.status !== "Pendente" && item.horarios) {
+            tdHorarios = `
+                <div style="font-size:11px; line-height:1.4;">
+                    <b>E:</b> ${item.horarios.entrada || '--:--'} | <b>S:</b> ${item.horarios.saida || '--:--'}<br>
+                    <b>I1:</b> ${item.horarios.int1Ini || '--:--'} às ${item.horarios.int1Fim || '--:--'}<br>
+                    <b>I2:</b> ${item.horarios.int2Ini || '--:--'} às ${item.horarios.int2Fim || '--:--'}
+                </div>
+            `;
+        }
+
+        let acoesHtml = "";
+        if(item.status === "Pendente") {
+            acoesHtml = `<button class="btn btn-manage btn-small" onclick="openResponderEscala('${k}')" style="width:100%; justify-content:center;"><i class="fas fa-edit"></i> Escalador: Preencher</button>`;
+        } else if (item.status === "Respondido") {
+            acoesHtml = `<button class="btn btn-save btn-small" onclick="marcarEscalaFeito('${k}')" style="width:100%; justify-content:center;"><i class="fas fa-check-double"></i> Lançar Oitchau (Feito)</button>`;
+        } else {
+            acoesHtml = `<div style="text-align:center; font-weight:700; color:var(--brand); font-size:12px;">Finalizado por:<br>${item.finalizador}</div>`;
+        }
+
+        let dataFormatada = "";
+        if(item.dataRef) {
+            const pt = item.dataRef.split('-');
+            if(pt.length===3) dataFormatada = `${pt[2]}/${pt[1]}/${pt[0]}`;
+        }
+
+        tbody.innerHTML += `
+            <tr>
+                <td style="font-weight:700;">${dataFormatada}</td>
+                <td>
+                    <b>${item.cad}</b><br>
+                    <span style="font-size:12px; color:var(--text-muted);">${item.nome}</span>
+                </td>
+                <td>${item.tipo}</td>
+                <td>${item.solicitante}</td>
+                <td>${tdHorarios}</td>
+                <td style="font-weight:700; color:#3B82F6;">${item.escalador || '-'}</td>
+                <td>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <span class="status-badge ${statusClass}" style="width:100%; font-size:11px; padding:5px;">${item.status}</span>
+                        ${acoesHtml}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    if(keys.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">Nenhuma solicitação de escala registrada.</td></tr>`;
+    }
+}
+
+function openResponderEscala(id) {
+    const item = escalaData[id];
+    if(!item) return;
+
+    let dataFormatada = "";
+    if(item.dataRef) {
+        const pt = item.dataRef.split('-');
+        if(pt.length===3) dataFormatada = `${pt[2]}/${pt[1]}/${pt[0]}`;
+    }
+
+    document.getElementById('respEscalaId').value = id;
+    document.getElementById('respEscalaInfo').innerHTML = `<b>Motorista:</b> ${item.nome} (CAD: ${item.cad})<br><b>Data sem Ponto:</b> ${dataFormatada}`;
+    
+    // Limpar campos
+    document.getElementById('respEscalaNome').value = "";
+    document.getElementById('respEntrada').value = "";
+    document.getElementById('respSaida').value = "";
+    document.getElementById('respInt1Ini').value = "";
+    document.getElementById('respInt1Fim').value = "";
+    document.getElementById('respInt2Ini').value = "";
+    document.getElementById('respInt2Fim').value = "";
+
+    document.getElementById('escalaRespModal').style.display = 'flex';
+}
+
+function closeEscalaModal() {
+    document.getElementById('escalaRespModal').style.display = 'none';
+}
+
+function salvarRespostaEscala() {
+    const id = document.getElementById('respEscalaId').value;
+    const escalador = document.getElementById('respEscalaNome').value;
+
+    if(!escalador) {
+        alert("Escalador, por favor selecione o seu nome!");
+        return;
+    }
+
+    const hEntrada = document.getElementById('respEntrada').value;
+    const hSaida = document.getElementById('respSaida').value;
+    
+    if(!hEntrada || !hSaida) {
+        alert("Preencha ao menos a Entrada e a Saída!");
+        return;
+    }
+
+    const hor = {
+        entrada: hEntrada,
+        saida: hSaida,
+        int1Ini: document.getElementById('respInt1Ini').value,
+        int1Fim: document.getElementById('respInt1Fim').value,
+        int2Ini: document.getElementById('respInt2Ini').value,
+        int2Fim: document.getElementById('respInt2Fim').value
+    };
+
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateNow = new Date().toLocaleDateString('pt-BR');
+
+    escalaRef.child(id).update({
+        status: "Respondido",
+        escalador: escalador,
+        dataResposta: `${dateNow} ${timeNow}`,
+        horarios: hor
+    }).then(() => {
+        closeEscalaModal();
+    });
+}
+
+function marcarEscalaFeito(id) {
+    const adminFinalizador = document.getElementById('approverName').value;
+    if(!adminFinalizador) {
+        alert("Insira seu nome lá no topo da tela antes de Lançar como Feito!");
+        return;
+    }
+
+    if(!confirm("Tem certeza que já lançou esses horários no sistema oficial? Lançar como FEITO?")) return;
+
+    const timeNow = new Date().toLocaleTimeString('pt-BR');
+    const dateNow = new Date().toLocaleDateString('pt-BR');
+
+    escalaRef.child(id).update({
+        status: "Feito",
+        finalizador: adminFinalizador,
+        dataFeito: `${dateNow} ${timeNow}`
+    });
+}
+
+
+// --- GESTÃO DE BASE DE COLABORADORES ---
 function openManageModal() {
     document.getElementById('manageModal').style.display = 'flex';
     renderBranchOptions('branchList');
@@ -965,93 +1218,8 @@ function renderManageList() {
     });
 }
 
-// --- BUSCA INDIVIDUAL DETALHADA ---
-function searchDriver() {
-    const term = document.getElementById('indivSearchInput').value.trim().toLowerCase();
-    const resDiv = document.getElementById('indivSearchResult');
-    
-    if (!term) { resDiv.style.display = 'none'; document.getElementById('indivPeriodContainer').style.display = 'none'; return; }
 
-    const found = driverList.find(d => d.c === term || d.n.toLowerCase().includes(term));
-
-    resDiv.style.display = 'block';
-    if (found) {
-        selectedIndivCad = found.c;
-        const tipoStr = found.t === 'fretamento' ? 'Fretamento' : 'Motorista Rodoviário';
-        resDiv.style.background = '#F0FDF4';
-        resDiv.style.color = '#065F46';
-        resDiv.style.borderColor = '#10B981';
-        resDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>Colaborador Localizado:</b><br><span style="font-size: 19px; font-weight:800; display:block; margin:5px 0;">${found.n}</span>Filial: ${found.b} | CAD: ${found.c} | Setor: ${tipoStr}`;
-        renderIndividualPeriod(); 
-    } else {
-        selectedIndivCad = "";
-        resDiv.style.background = '#FEE2E2';
-        resDiv.style.color = '#991B1B';
-        resDiv.style.borderColor = '#EF4444';
-        resDiv.innerHTML = `<i class="fas fa-times-circle"></i> <b>Não localizado.</b><br>Verifique se o CAD ou o Nome estão corretos.`;
-        document.getElementById('indivPeriodContainer').style.display = 'none';
-    }
-}
-
-function applyIndividualDayAction(dateKeyStr, statusType) {
-    const approver = document.getElementById('approverName').value;
-    if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
-
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateRealization = new Date().toLocaleDateString('pt-BR');
-    const path = `pontos/${dateKeyStr}/${selectedIndivCad}`;
-    const currentRecord = (db[dateKeyStr] && db[dateKeyStr][selectedIndivCad]) ? db[dateKeyStr][selectedIndivCad] : null;
-    const currentObs = currentRecord ? currentRecord.obs : "";
-    
-    let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-    historyObj[Date.now()] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization };
-
-    database.ref(path).set({ status: statusType, approver: approver, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj });
-}
-
-function applyIndividualAction(statusType) {
-    const approver = document.getElementById('approverName').value;
-    if(!approver) { alert("Preencha seu nome de Aprovador lá no topo!"); return; }
-    if (!selectedIndivCad) { alert("Busque e selecione um colaborador válido primeiro."); return; }
-
-    const startVal = document.getElementById('indivStartDate').value;
-    const endVal = document.getElementById('indivEndDate').value;
-
-    if(!startVal || !endVal) { alert("Defina o período (Data Inicial e Final)!"); return; }
-
-    const start = new Date(startVal + "T12:00:00");
-    const end = new Date(endVal + "T12:00:00");
-
-    if(start > end) { alert("A Data Inicial não pode ser maior que a Final!"); return; }
-
-    let actionName = statusType === 'OK' ? "APROVAR TODO O PERÍODO" : (statusType === 'Erro' ? "REPROVAR TODO O PERÍODO" : "DEIXAR TODO O PERÍODO PENDENTE");
-    if(!confirm(`${actionName}\n\nTem certeza que deseja aplicar isso para todos os dias entre ${start.toLocaleDateString('pt-BR')} e ${end.toLocaleDateString('pt-BR')}?`)) return;
-
-    const timeNow = new Date().toLocaleTimeString('pt-BR');
-    const dateRealization = new Date().toLocaleDateString('pt-BR');
-    const updates = {};
-    let loopDate = new Date(start);
-    let idx = 0;
-
-    while(loopDate <= end) {
-        const dateKey = loopDate.toISOString().split('T')[0];
-        const path = `pontos/${dateKey}/${selectedIndivCad}`;
-        const currentRecord = (db[dateKey] && db[dateKey][selectedIndivCad]) ? db[dateKey][selectedIndivCad] : null;
-        const currentObs = currentRecord ? currentRecord.obs : "";
-        
-        let historyObj = (currentRecord && currentRecord.history) ? currentRecord.history : {};
-        historyObj[Date.now() + "_" + (idx++)] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization };
-
-        updates[path] = { status: statusType, approver: approver, time: timeNow, actionDate: dateRealization, obs: currentObs, history: historyObj };
-        loopDate.setDate(loopDate.getDate() + 1);
-    }
-
-    database.ref().update(updates)
-        .then(() => alert(`Operação finalizada com sucesso!`))
-        .catch((err) => alert("Erro: " + err.message));
-}
-
-// --- EXPORTAR EXCEL (Mapeado com novos status e data de realização) ---
+// --- EXPORTAR EXCEL (PONTOS NORMAIS E ESCALA) ---
 function downloadCSV(content, fileName) {
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -1117,4 +1285,30 @@ function exportDetailedReport() {
     
     const fileName = `ExpressoNordeste_RelatorioDetalhado_${limits.start.toLocaleDateString('pt-BR').replace(/\//g,'-')}_a_${limits.end.toLocaleDateString('pt-BR').replace(/\//g,'-')}.csv`;
     downloadCSV(csv, fileName);
+}
+
+// Planilha Exclusiva das Tratativas de Escala
+function exportarEscalaExcel() {
+    let csv = "\ufeffData Referencia;CAD;Motorista;Categoria;Status Atual;Solicitante;Abertura;Escalador Responsavel;Data Resposta;Horario Informado;Lançado Por (Finalizador);Data Lançado\n";
+    
+    const keys = Object.keys(escalaData).sort((a,b) => b.localeCompare(a));
+    
+    keys.forEach(k => {
+        const item = escalaData[k];
+        
+        let dataFormatada = "";
+        if(item.dataRef) {
+            const pt = item.dataRef.split('-');
+            if(pt.length===3) dataFormatada = `${pt[2]}/${pt[1]}/${pt[0]}`;
+        }
+
+        let strHorarios = "Pendente";
+        if (item.horarios) {
+            strHorarios = `Ent:${item.horarios.entrada || ''} / I1:${item.horarios.int1Ini || ''}-${item.horarios.int1Fim || ''} / I2:${item.horarios.int2Ini || ''}-${item.horarios.int2Fim || ''} / Sai:${item.horarios.saida || ''}`;
+        }
+
+        csv += `${dataFormatada};${item.cad};${item.nome};${item.tipo};${item.status};${item.solicitante};${item.dataAbertura || ''};${item.escalador || ''};${item.dataResposta || ''};${strHorarios};${item.finalizador || ''};${item.dataFeito || ''}\n`;
+    });
+
+    downloadCSV(csv, `ExpressoNordeste_Historico_Escalas.csv`);
 }
